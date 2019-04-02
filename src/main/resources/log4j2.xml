@@ -1,18 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Configuration>
-	  
+<Configuration status="WARN">
 	<Appenders>
-		<Console name="console" target="SYSTEM_OUT">
+		<Console name="Console" target="SYSTEM_OUT">
 			<PatternLayout pattern="%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5p %C:%L [%t] - %m%n"/>
 		</Console>
 	</Appenders>
-	
 	<Loggers>
-		<Root level="info">
-			<AppenderRef ref="console" />
+		<Root level="INFO">
+			<AppenderRef ref="Console"/>
 		</Root>
-		<Logger name="eu.europeana" level="debug" additivity="false">
-			<AppenderRef ref="console" />
-		</Logger>
 	</Loggers>
 </Configuration>
