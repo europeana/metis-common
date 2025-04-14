@@ -10,8 +10,7 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 /**
- * This module is only intended for use in test code.
- * It provides test data factories and shared test utilities.
+ * This module is only intended for use in test code. It provides test data factories and shared test utilities.
  */
 
 public class JwtUtils {
@@ -21,8 +20,15 @@ public class JwtUtils {
   public static final String MOCK_INVALID_TOKEN = "invalidToken";
   private final List<String> resourceNames;
 
+  /**
+   * Constructs a new instance of JwtUtils. This utility class is primarily used for generating and handling JWTs for testing
+   * purposes, including creating tokens with various roles and user configurations.
+   *
+   * @param resourceNames A list of resource names that will be associated with the generated JWT tokens, representing the
+   * resources the token has access to.
+   */
   public JwtUtils(List<String> resourceNames) {
-    this.resourceNames = resourceNames;
+    this.resourceNames = List.copyOf(resourceNames);
   }
 
   public Jwt getAdminJwt() {
@@ -55,10 +61,6 @@ public class JwtUtils {
 
   private @NotNull Jwt getJwtNoUserId(String token, List<String> roles) {
     return getJwt(token, null, roles);
-  }
-
-  private @NotNull Jwt getJwtEmptyUserId(String token, List<String> roles) {
-    return getJwt(token, "", roles);
   }
 
   private @NotNull Jwt getJwt(String token, String withUserId, List<String> roles) {

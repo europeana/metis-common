@@ -34,8 +34,15 @@ public class KeycloakJwtGrantedAuthoritiesConverter implements Converter<Jwt, Ab
   private final List<String> grantedResources;
   private final boolean grantRealmAccessRoles;
 
+  /**
+   * Creates a new instance of KeycloakJwtGrantedAuthoritiesConverter. This converter is responsible for transforming Keycloak JWT
+   * claims into granted authorities for Spring Security.
+   *
+   * @param grantedResources a list of resource names that determine which resources' roles should be included in the authorities
+   * @param grantRealmAccessRoles a flag indicating whether to grant roles from the realm access section of the JWT
+   */
   public KeycloakJwtGrantedAuthoritiesConverter(List<String> grantedResources, boolean grantRealmAccessRoles) {
-    this.grantedResources = grantedResources;
+    this.grantedResources = List.copyOf(grantedResources);
     this.grantRealmAccessRoles = grantRealmAccessRoles;
   }
 
@@ -69,7 +76,7 @@ public class KeycloakJwtGrantedAuthoritiesConverter implements Converter<Jwt, Ab
   }
 
   static @NotNull String prefixRole(String resourceName, String role) {
-    return "%s_%s" .formatted(resourceName, role);
+    return "%s_%s".formatted(resourceName, role);
   }
 
   /**
