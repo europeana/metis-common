@@ -1,4 +1,4 @@
-package metis.common.config.properties.ecloud;
+package eu.europeana.metis.common.config.properties.ecloud;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 

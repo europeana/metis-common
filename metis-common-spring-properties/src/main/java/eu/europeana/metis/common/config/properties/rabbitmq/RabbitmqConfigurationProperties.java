@@ -1,4 +1,4 @@
-package metis.common.config.properties.rabbitmq;
+package eu.europeana.metis.common.config.properties.rabbitmq;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 

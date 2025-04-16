@@ -1,4 +1,4 @@
-package metis.common.config.properties.postgres;
+package eu.europeana.metis.common.config.properties.postgres;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 

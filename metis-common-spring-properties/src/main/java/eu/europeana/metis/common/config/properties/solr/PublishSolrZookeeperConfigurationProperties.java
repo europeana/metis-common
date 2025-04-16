@@ -1,4 +1,4 @@
-package metis.common.config.properties.solr;
+package eu.europeana.metis.common.config.properties.solr;
 
 
 import org.springframework.boot.context.properties.ConfigurationProperties;

@@ -1,4 +1,4 @@
-package metis.common.config.properties;
+package eu.europeana.metis.common.config.properties;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 

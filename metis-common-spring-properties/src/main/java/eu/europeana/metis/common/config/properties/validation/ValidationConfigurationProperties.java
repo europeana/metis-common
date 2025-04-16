@@ -1,4 +1,4 @@
-package metis.common.config.properties.validation;
+package eu.europeana.metis.common.config.properties.validation;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 

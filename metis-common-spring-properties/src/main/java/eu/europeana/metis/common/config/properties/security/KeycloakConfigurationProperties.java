@@ -1,4 +1,4 @@
-package metis.common.config.properties.security;
+package eu.europeana.metis.common.config.properties.security;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 

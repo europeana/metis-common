@@ -1,4 +1,4 @@
-package metis.common.config.properties.mongo;
+package eu.europeana.metis.common.config.properties.mongo;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 

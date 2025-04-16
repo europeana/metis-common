@@ -1,4 +1,4 @@
-package metis.common.config.properties.redis;
+package eu.europeana.metis.common.config.properties.redis;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
