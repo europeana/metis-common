@@ -30,6 +30,7 @@ import eu.europeana.corelib.solr.entity.EuropeanaAggregationImpl;
 import eu.europeana.corelib.solr.entity.EventImpl;
 import eu.europeana.corelib.solr.entity.LicenseImpl;
 import eu.europeana.corelib.solr.entity.OrganizationImpl;
+import eu.europeana.corelib.solr.entity.PersistentIdentifierImpl;
 import eu.europeana.corelib.solr.entity.PhysicalThingImpl;
 import eu.europeana.corelib.solr.entity.PlaceImpl;
 import eu.europeana.corelib.solr.entity.ProvidedCHOImpl;
@@ -105,6 +106,7 @@ public class RecordDao {
     mapper.getEntityModel(LicenseImpl.class);
     mapper.getEntityModel(ServiceImpl.class);
     mapper.getEntityModel(QualityAnnotationImpl.class);
+    mapper.getEntityModel(PersistentIdentifierImpl.class);
     mapper.getEntityModel(AttributionSnippet.class);
     mapper.getEntityModel(DatasetImpl.class);
     mapper.getEntityModel(ImageMetaInfoImpl.class);
