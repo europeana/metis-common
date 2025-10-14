@@ -120,23 +120,26 @@ public class CompressedFileHandler {
         && !zipEntry.getName().endsWith(MAC_TEMP_FILE);
   }
 
-
   private static void extractZipFile(final Path compressedFile, final Path destinationFolder) throws IOException {
+
     final List<Path> nestedCompressedFiles = new ArrayList<>();
+    FolderDivider divider=new FolderDivider(destinationFolder);
     try (ZipArchiveInputStream is = new ZipArchiveInputStream(Files.newInputStream(compressedFile))) {
       ZipArchiveEntry entry;
       while ((entry = is.getNextEntry()) != null) {
         final String entryName = replaceBannedCharacters(entry.getName());
         // create a new path, protect against malicious zip files
-        final Path newPath = zipSlipVulnerabilityProtect(entryName, destinationFolder);
+
+        Path destinationSubFolder = divider.getFolderForNextFile();
+        final Path newPath = zipSlipVulnerabilityProtect(entryName, destinationSubFolder);
         if (CompressedFileExtension.hasCompressedFileExtension(entry.getName())) {
-          nestedCompressedFiles.add(destinationFolder.resolve(entry.getName()));
+          nestedCompressedFiles.add(destinationSubFolder.resolve(entry.getName()));
         }
         extract(is, entry, newPath);
       }
     }
     for (Path nestedCompressedFile : nestedCompressedFiles) {
-      extractFile(nestedCompressedFile, nestedCompressedFile.getParent());
+      extractFile(nestedCompressedFile, divider.getFolderForNestedArchive());
     }
   }
 
@@ -144,6 +147,7 @@ public class CompressedFileHandler {
 
     Set<Path> nestedCompressedFiles = new HashSet<>();
 
+    FolderDivider divider=new FolderDivider(destinationFolder);
     try (InputStream fi = Files.newInputStream(compressedFile);
         BufferedInputStream bi = new BufferedInputStream(fi);
         GzipCompressorInputStream gzi = new GzipCompressorInputStream(bi);
@@ -153,16 +157,17 @@ public class CompressedFileHandler {
       while ((entry = ti.getNextEntry()) != null) {
         final String entryName = replaceBannedCharacters(entry.getName());
         // create a new path, protect against malicious zip files
-        final Path newPath = zipSlipVulnerabilityProtect(entryName, destinationFolder);
+        Path destinationSubFolder = divider.getFolderForNextFile();
+        final Path newPath = zipSlipVulnerabilityProtect(entryName, destinationSubFolder);
         if (CompressedFileExtension.hasCompressedFileExtension(entry.getName())) {
-          nestedCompressedFiles.add(destinationFolder.resolve(entry.getName()));
+          nestedCompressedFiles.add(destinationSubFolder.resolve(entry.getName()));
         }
         extract(ti, entry, newPath);
       }
     }
 
     for (Path file : nestedCompressedFiles) {
-      extractFile(file, file.getParent());
+      extractFile(file, divider.getFolderForNestedArchive());
     }
   }
 
@@ -181,20 +186,22 @@ public class CompressedFileHandler {
   private static void extractTarFile(final Path compressedFile, final Path destinationFolder)
       throws IOException {
     final List<Path> nestedCompressedFiles = new ArrayList<>();
+    FolderDivider divider=new FolderDivider(destinationFolder);
     try (TarArchiveInputStream is = new TarArchiveInputStream(Files.newInputStream(compressedFile))) {
       TarArchiveEntry entry;
       while ((entry = is.getNextEntry()) != null) {
         final String entryName = replaceBannedCharacters(entry.getName());
         // create a new path, protect against malicious tar files
-        final Path newPath = zipSlipVulnerabilityProtect(entryName, destinationFolder);
+        Path destinationSubFolder = divider.getFolderForNextFile();
+        final Path newPath = zipSlipVulnerabilityProtect(entryName, destinationSubFolder);
         if (CompressedFileExtension.hasCompressedFileExtension(entry.getName())) {
-          nestedCompressedFiles.add(destinationFolder.resolve(entry.getName()));
+          nestedCompressedFiles.add(destinationSubFolder.resolve(entry.getName()));
         }
         extract(is, entry, newPath);
       }
     }
     for (Path nestedCompressedFile : nestedCompressedFiles) {
-      extractFile(nestedCompressedFile, nestedCompressedFile.getParent());
+      extractFile(nestedCompressedFile, divider.getFolderForNestedArchive());
     }
   }
 
@@ -226,5 +233,46 @@ public class CompressedFileHandler {
       throw new IOException("Entry is outside of the target dir: " + entryName);
     }
     return normalizePath;
+  }
+
+  private static class FolderDivider {
+
+    private static final int FILE_LIMIT = 10000;
+    private final Path mainFolder;
+
+    int currentFolderFileCount;
+    int extractedSubFolderCount;
+    private Path currentDirectory;
+
+    private int nestedArchiveFolderCount;
+
+
+    public FolderDivider(Path mainFolder) throws IOException {
+      this.mainFolder = mainFolder;
+      createNextSubFolder();
+    }
+
+    private void createNextSubFolder() throws IOException {
+      extractedSubFolderCount++;
+      currentDirectory = Files.createDirectories(mainFolder.resolve("extracted-" + extractedSubFolderCount));
+    }
+
+    public Path getFolderForNextFile() throws IOException {
+      if (currentFolderFileCount >= FILE_LIMIT) {
+        createNextSubFolder();
+        currentFolderFileCount=0;
+      }
+
+      currentFolderFileCount++;
+      return currentDirectory;
+    }
+
+    public Path getFolderForNestedArchive() throws IOException {
+      getFolderForNextFile();
+      nestedArchiveFolderCount++;
+      String nestedDir = currentDirectory.resolve("nested-archive-no-" + nestedArchiveFolderCount).toString();
+      return Files.createDirectories(Path.of(nestedDir));
+    }
+
   }
 }
