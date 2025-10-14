@@ -1,91 +1,91 @@
 package eu.europeana.metis.utils;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.spy;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
-import org.apache.commons.io.IOUtils;
+import java.util.zip.ZipOutputStream;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Unit tests for {@link CompressedFileHandler}
  */
 class CompressedFileHandlerRecordsTest {
 
-  @Test
-  void testGetRecordsFromEmptyZipFile() throws IOException {
 
-    // Call CompressedFileHandler for empty ZIP file
-    final ZipFile emptyZipFile = mock(ZipFile.class);
-    doReturn(Stream.empty()).when(emptyZipFile).stream();
-    assertTrue(new CompressedFileHandler().getRecordsFromZipFile(emptyZipFile).isEmpty());
-
-    // Create ZIP file with bad content and CompressedFileHandler that rejects everything
-    final List<ZipEntry> entries =
-        Stream.of("A", "B", "C").map(name -> createEntry(name, false)).toList();
-    final CompressedFileHandler reader = spy(CompressedFileHandler.class);
-    final ZipFile zipFileWithBadContent = mock(ZipFile.class);
-    doReturn(entries.stream()).when(zipFileWithBadContent).stream();
-    doReturn(false).when(reader).accept(any());
-    assertTrue(reader.getRecordsFromZipFile(zipFileWithBadContent).isEmpty());
-  }
+  @TempDir
+  File tempDir;
 
   @Test
   void testGetRecordsFromZipFile() throws IOException {
+    File zipFile = new File(tempDir, "test.zip");
+    try (FileOutputStream fos = new FileOutputStream(zipFile);
+        ZipOutputStream zos = new ZipOutputStream(fos, StandardCharsets.UTF_8)) {
+      addTextEntry(zos, "file1.txt", "Hello World");
+      addTextEntry(zos, "file2.txt", "Another File");
+      addTextEntry(zos, "nested/file3.txt", "Nested File");
+    }
 
-    // We have good entries (regular entries) and bad entries (directories).
-    final List<String> goodEntries = Arrays.asList("A", "B", "C");
-    final List<ZipEntry> entries = goodEntries.stream().map(name -> createEntry(name, false)).collect(Collectors.toList());
-    final List<String> badEntries = Arrays.asList("X", "Y", "Z");
-    entries.addAll(badEntries.stream().map(name -> createEntry(name, true)).toList());
+    List<String> records;
+    try (ZipFile zf = new ZipFile(zipFile, StandardCharsets.UTF_8)) {
+      records = new CompressedFileHandler().getRecordsFromZipFile(zf);
+    }
 
-    // The content is equal to the name.
-    final ZipFile zipFile = mock(ZipFile.class);
-    doReturn(entries.stream()).when(zipFile).stream();
-    doAnswer(invocation -> IOUtils.toInputStream(((ZipEntry) invocation.getArgument(0)).getName(),
-        StandardCharsets.UTF_8))
-        .when(zipFile).getInputStream(any());
-
-    // Create CompressedFileHandler that knows the difference between good and bad.
-    final CompressedFileHandler reader = spy(CompressedFileHandler.class);
-    doAnswer(invocation -> goodEntries.contains(((ZipEntry) invocation.getArgument(0)).getName()))
-        .when(reader).accept(any());
-
-    // The result should therefore be equal to the list of good entries.
-    final List<String> result = reader.getRecordsFromZipFile(zipFile);
-    assertEquals(goodEntries, result);
+    assertEquals(3, records.size());
+    assertTrue(records.contains("Hello World"));
+    assertTrue(records.contains("Another File"));
+    assertTrue(records.contains("Nested File"));
   }
 
   @Test
-  void testAccept() {
-    // Test against directories and special Mac files. Entry examples taken from actual zip file.
-    CompressedFileHandler compressedFileHandler = new CompressedFileHandler();
-    assertFalse(compressedFileHandler.accept(createEntry("Internal_valid/", true)));
-    assertFalse(compressedFileHandler.accept(createEntry("Internal_valid/.DS_Store", false)));
-    assertFalse(compressedFileHandler.accept(createEntry("__MACOSX/", true)));
-    assertFalse(compressedFileHandler.accept(createEntry("__MACOSX/Internal_valid/", true)));
-    assertFalse(compressedFileHandler.accept(createEntry("__MACOSX/Internal_valid/._.DS_Store", false)));
-    assertTrue(compressedFileHandler.accept(createEntry("Internal_valid/Item_445790357.xml", false)));
-    assertFalse(compressedFileHandler.accept(createEntry("__MACOSX/Internal_valid/._Item_445790357.xml", false)));
+  void testGetRecordsFromEmptyZipFile() throws IOException {
+    File zipFile = new File(tempDir, "empty.zip");
+    try (FileOutputStream fos = new FileOutputStream(zipFile);
+        ZipOutputStream zos = new ZipOutputStream(fos)) {
+      // just close immediately — produces valid empty zip
+    }
+
+    try (ZipFile zf = new ZipFile(zipFile)) {
+      List<String> records = new CompressedFileHandler().getRecordsFromZipFile(zf);
+      assertTrue(records.isEmpty(), "Expected no records for empty ZIP");
+    }
   }
 
-  private ZipEntry createEntry(String name, boolean isDirectory) {
-    final ZipEntry result = mock(ZipEntry.class);
-    doReturn(name).when(result).getName();
-    doReturn(isDirectory).when(result).isDirectory();
-    return result;
+  @Test
+  void testSkipMacOsEntries() throws IOException {
+    File file = new File(tempDir, "macos.zip");
+    try (FileOutputStream fos = new FileOutputStream(file);
+        ZipOutputStream zos = new ZipOutputStream(fos, StandardCharsets.UTF_8)) {
+
+      addTextEntry(zos, "Internal_valid/", "");
+      addTextEntry(zos, "__MACOSX/", ""); // directory
+      addTextEntry(zos, "__MACOSX/something", "Should be ignored");
+      addTextEntry(zos, "folder/.DS_Store", "Should also be ignored");
+      addTextEntry(zos, "valid/file1.txt", "Keep Me");
+      addTextEntry(zos, "valid/file2.txt", "Also Keep Me");
+    }
+
+    List<String> records;
+    try (ZipFile zipFile = new ZipFile(file, StandardCharsets.UTF_8)) {
+      records = new CompressedFileHandler().getRecordsFromZipFile(zipFile);
+    }
+
+    assertEquals(2, records.size());
+    assertTrue(records.contains("Keep Me"));
+    assertTrue(records.contains("Also Keep Me"));
+  }
+
+  private void addTextEntry(ZipOutputStream zos, String name, String content) throws IOException {
+    ZipEntry entry = new ZipEntry(name);
+    zos.putNextEntry(entry);
+    zos.write(content.getBytes(StandardCharsets.UTF_8));
+    zos.closeEntry();
   }
 }
