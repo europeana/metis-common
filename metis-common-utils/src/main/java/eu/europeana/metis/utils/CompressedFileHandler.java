@@ -13,8 +13,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -38,6 +40,7 @@ public class CompressedFileHandler {
 
   private static final String MAC_TEMP_FOLDER = "__MACOSX";
   private static final String MAC_TEMP_FILE = ".DS_Store";
+  private static final int MAX_ENTRIES_PER_DIR = 2;
   public static final String FILE_NAME_BANNED_CHARACTERS = "% $:?&#<>|*," + Character.MIN_VALUE;
 
   /**
@@ -66,7 +69,18 @@ public class CompressedFileHandler {
   }
 
   private static void extractInternal(Path compressedFile, Path destinationFolder) throws IOException {
-    Files.createDirectories(destinationFolder);
+    Path fileNameWithoutExtension = CompressedFileExtension.removeExtension(compressedFile.getFileName());
+    Path normalizedDestination;
+
+    // If destination already ends with the same name, don't append again
+    if (destinationFolder.getFileName() != null
+        && destinationFolder.getFileName().equals(fileNameWithoutExtension)) {
+      normalizedDestination = destinationFolder; // reuse
+    } else {
+      normalizedDestination = destinationFolder.resolve(fileNameWithoutExtension);
+    }
+
+    Files.createDirectories(normalizedDestination);
 
     final List<Path> nestedArchives = new ArrayList<>();
 
@@ -75,13 +89,15 @@ public class CompressedFileHandler {
         ArchiveInputStream<?> archiveInputStream = createArchiveInputStream(bufferedInputStream, compressedFile)) {
 
       if (archiveInputStream == null) {
-        handleSingleCompressedFile(compressedFile, destinationFolder);
+        handleSingleCompressedFile(compressedFile, normalizedDestination);
         return;
       }
-      nestedArchives.addAll(extractEntriesAndReturnNestedArchives(archiveInputStream, destinationFolder));
+      nestedArchives.addAll(extractEntriesAndReturnNestedArchives(archiveInputStream, normalizedDestination));
     }
+
     extractNestedArchives(nestedArchives);
   }
+
 
   private static ArchiveInputStream<?> createArchiveInputStream(BufferedInputStream bis, Path compressedFile) {
     try {
@@ -92,29 +108,55 @@ public class CompressedFileHandler {
     }
   }
 
-  private static List<Path> extractEntriesAndReturnNestedArchives(ArchiveInputStream<?> archiveInputStream,
-      Path destinationFolder)
-      throws IOException {
-    final List<Path> nestedArchives = new ArrayList<>();
+  private static List<Path> extractEntriesAndReturnNestedArchives(
+      ArchiveInputStream<?> archiveInputStream, Path destinationFolder) throws IOException {
+
+    List<Path> nestedArchives = new ArrayList<>();
+    Map<Path, Integer> entryCountersForPath = new HashMap<>();
+    // Maps original (logical) directory to its relocated (partitioned) physical path
+    Map<Path, Path> relocatedParents = new HashMap<>();
+    relocatedParents.put(destinationFolder, destinationFolder); // identity for root
+
     ArchiveEntry entry;
     while ((entry = archiveInputStream.getNextEntry()) != null) {
       if (skipMacFiles(entry)) {
         continue;
       }
 
-      final String entryName = replaceBannedCharacters(entry.getName());
-      final Path entryPath = zipSlipVulnerabilityProtect(entryName, destinationFolder);
+      String rawEntryName = replaceBannedCharacters(entry.getName());
+      Path safePath = zipSlipVulnerabilityProtect(rawEntryName, destinationFolder);
 
-      if (entry.isDirectory()) {
-        createDirectories(entryPath);
+      // The directory that *logically* contains this entry (unpartitioned path)
+      Path logicalParent = (safePath.getParent() != null) ? safePath.getParent() : destinationFolder;
+      // Where that logical parent was actually created (possibly under part_X/…)
+      Path mappedParent = relocatedParents.getOrDefault(logicalParent, logicalParent);
+
+      // Determine the partition bucket under the *mapped* parent
+      Path partitionedParent = getPartitionedParent(mappedParent, entryCountersForPath);
+      Path entryPath = partitionedParent.resolve(safePath.getFileName());
+
+      boolean isDirectory = entry.isDirectory();
+      if (isDirectory) {
+        // Create the relocated directory and remember its new physical path
+        Files.createDirectories(entryPath);
+        relocatedParents.put(safePath, entryPath);
       } else {
         extractFileEntry(archiveInputStream, entryPath);
-        if (CompressedFileExtension.hasCompressedFileExtension(entryName)) {
+        if (CompressedFileExtension.hasCompressedFileExtension(rawEntryName)) {
           nestedArchives.add(entryPath);
         }
       }
     }
+
     return nestedArchives;
+  }
+
+  private static Path getPartitionedParent(Path parentDir, Map<Path, Integer> counters) throws IOException {
+    int index = counters.compute(parentDir, (k, v) -> (v == null) ? 0 : (v + 1));
+    int partitionNumber = index / MAX_ENTRIES_PER_DIR;
+    Path partitionDir = parentDir.resolve("part_" + partitionNumber);
+    Files.createDirectories(partitionDir);
+    return partitionDir;
   }
 
   private static void extractFileEntry(ArchiveInputStream<?> ais, Path entryPath)

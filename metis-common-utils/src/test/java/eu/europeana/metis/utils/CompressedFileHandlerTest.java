@@ -40,6 +40,7 @@ class CompressedFileHandlerTest {
   private static final String ZIP_FILE2 = "zipFileWithNestedFolders.zip";
   private static final String ZIP_FILE3 = "ZipFilesWithMixedCompressedFiles.zip";
   private static final String ZIP_FILE4 = "zipFileWithSubdirContainingSpaceInName.zip";
+  private static final String ZIP_FILE5 = "zipExample.zip";
 
   @AfterEach
   void cleanUp() {
@@ -47,8 +48,13 @@ class CompressedFileHandlerTest {
               getPrefix(TAR_GZ_FILE1),
               getPrefix(TAR_GZ_FILE2),
               getPrefix(TAR_GZ_FILE3),
-              DESTINATION_NAME_FOR_ZIP_WITH_SPACES,
-              ZIP_EXTRACTION_DESTINATION_NAME
+              getPrefix(TAR_GZ_FILE4),
+              getPrefix(TAR_FILE),
+              getPrefix(ZIP_FILE1),
+              getPrefix(ZIP_FILE2),
+              getPrefix(ZIP_FILE3),
+              getPrefix(ZIP_FILE4),
+              getPrefix(ZIP_FILE5)
           ).map(name -> DESTINATION_DIR.resolve(name).toFile())
           .filter(File::exists)
           .forEach(file -> {
@@ -95,15 +101,16 @@ class CompressedFileHandlerTest {
         Arguments.of(TAR_GZ_FILE1, getPrefix(TAR_GZ_FILE1), 13, false),
         Arguments.of(TAR_GZ_FILE2, getPrefix(TAR_GZ_FILE2), 13, false),
         Arguments.of(TAR_GZ_FILE3, getPrefix(TAR_GZ_FILE3), 13, false),
-        Arguments.of(TAR_GZ_FILE4, DESTINATION_NAME_FOR_ZIP_WITH_SPACES, 10, true),
-        Arguments.of(TAR_FILE, DESTINATION_NAME_FOR_ZIP_WITH_SPACES, 10, true),
+        Arguments.of(TAR_GZ_FILE4, getPrefix(TAR_GZ_FILE4), 10, true),
+        Arguments.of(TAR_FILE, getPrefix(TAR_FILE), 10, true),
 
         // ZIP tests
-        Arguments.of(ZIP_FILE1, ZIP_EXTRACTION_DESTINATION_NAME, 13, false),
-        Arguments.of(ZIP_FILE2, ZIP_EXTRACTION_DESTINATION_NAME, 13, false),
-        Arguments.of(ZIP_FILE3, ZIP_EXTRACTION_DESTINATION_NAME, 13, false),
-        Arguments.of(ZIP_FILE4, DESTINATION_NAME_FOR_ZIP_WITH_SPACES, 10, true)
-    );
+        Arguments.of(ZIP_FILE5, getPrefix(ZIP_FILE5), 50, true),
+        Arguments.of(ZIP_FILE1, getPrefix(ZIP_FILE1), 13, false),
+        Arguments.of(ZIP_FILE2, getPrefix(ZIP_FILE2), 13, false),
+        Arguments.of(ZIP_FILE3, getPrefix(ZIP_FILE3), 13, false),
+        Arguments.of(ZIP_FILE4, getPrefix(ZIP_FILE4), 10, true)
+        );
   }
 
   private static Stream<Arguments> shouldFailWhenProvidedFileIsNotCompressed() {
