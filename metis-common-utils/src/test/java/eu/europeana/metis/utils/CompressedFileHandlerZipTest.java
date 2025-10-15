@@ -27,13 +27,12 @@ class CompressedFileHandlerZipTest {
   private final static String FILE_NAME4 = "zipFileWithSubdirContainingSpaceInName";
   private final static String XML_TYPE = "xml";
   public static final String FILE_EXTENSION = ".zip";
-  public static final String EXTRACTED_SUBFOLDER = "extracted-1";
 
   @Test
   void shouldUnpackTheZipFilesRecursively() throws IOException {
     CompressedFileHandler.extractFile(Path.of(DESTINATION_DIR + FILE_NAME + FILE_EXTENSION),
         Path.of(DESTINATION_DIR));
-    Collection<File> files = getXMLFiles(DESTINATION_DIR + EXTRACTED_SUBFOLDER );
+    Collection<File> files = getXMLFiles(DESTINATION_DIR);
     assertNotNull(files);
     assertEquals(XML_FILES_COUNT, files.size());
   }
@@ -42,7 +41,7 @@ class CompressedFileHandlerZipTest {
   void shouldUnpackTheZipFilesWithNestedFoldersRecursively() throws IOException {
     CompressedFileHandler.extractFile(Path.of(DESTINATION_DIR + FILE_NAME2 + FILE_EXTENSION),
         Path.of(DESTINATION_DIR));
-    Collection<File> files = getXMLFiles(DESTINATION_DIR+ EXTRACTED_SUBFOLDER );
+    Collection<File> files = getXMLFiles(DESTINATION_DIR);
     assertNotNull(files);
     assertEquals(XML_FILES_COUNT, files.size());
   }
@@ -51,7 +50,7 @@ class CompressedFileHandlerZipTest {
   void shouldUnpackTheZipFilesWithNestedMixedCompressedFiles() throws IOException {
     CompressedFileHandler.extractFile(Path.of(DESTINATION_DIR + FILE_NAME3 + FILE_EXTENSION),
         Path.of(DESTINATION_DIR));
-    Collection<File> files = getXMLFiles(DESTINATION_DIR + EXTRACTED_SUBFOLDER);
+    Collection<File> files = getXMLFiles(DESTINATION_DIR );
     assertNotNull(files);
     assertEquals(XML_FILES_COUNT, files.size());
   }
@@ -61,7 +60,7 @@ class CompressedFileHandlerZipTest {
     CompressedFileHandler.extractFile(Path.of(DESTINATION_DIR + FILE_NAME4 + FILE_EXTENSION),
         Path.of(DESTINATION_DIR));
 
-    Collection<File> files = getXMLFiles(DESTINATION_DIR + EXTRACTED_SUBFOLDER );
+    Collection<File> files = getXMLFiles(DESTINATION_DIR);
     assertNotNull(files);
     assertEquals(10, files.size());
 
@@ -76,8 +75,8 @@ class CompressedFileHandlerZipTest {
 
   @AfterEach
   public void cleanUp() throws IOException {
-    if (new File(DESTINATION_DIR + EXTRACTED_SUBFOLDER).exists()) {
-      FileUtils.forceDelete(new File(DESTINATION_DIR + EXTRACTED_SUBFOLDER));
+    for(File extractedDir:(new File(DESTINATION_DIR).listFiles((dir, name) ->name.startsWith("extracted-")))){
+      FileUtils.forceDelete(extractedDir);
     }
   }
 }
