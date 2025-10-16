@@ -24,9 +24,8 @@ class CompressedFileHandlerTest {
 
   private static final Path DESTINATION_DIR = Path.of("src", "test", "resources", "__files");
   private static final String XML_TYPE = "xml";
-  private static final String DESTINATION_NAME_FOR_ZIP_WITH_SPACES = "zip_file";
-  private static final String ZIP_EXTRACTION_DESTINATION_NAME = "zipFile";
   private static final String NON_COMPRESSED_FILE = "non_compressed_file.txt";
+  private static final String UNSUPPORTED_TAR_BZ2 = "archive.tar.bz2";
 
   // GZ/TAR test files
   private static final String TAR_GZ_FILE1 = "gzFile.tgz";
@@ -40,7 +39,7 @@ class CompressedFileHandlerTest {
   private static final String ZIP_FILE2 = "zipFileWithNestedFolders.zip";
   private static final String ZIP_FILE3 = "ZipFilesWithMixedCompressedFiles.zip";
   private static final String ZIP_FILE4 = "zipFileWithSubdirContainingSpaceInName.zip";
-  private static final String ZIP_FILE5 = "zipExample.zip";
+  private static final String ZIP_FILE5 = "zipWithDirectories.zip";
 
   @AfterEach
   void cleanUp() {
@@ -105,17 +104,18 @@ class CompressedFileHandlerTest {
         Arguments.of(TAR_FILE, getPrefix(TAR_FILE), 10, true),
 
         // ZIP tests
-        Arguments.of(ZIP_FILE5, getPrefix(ZIP_FILE5), 50, true),
         Arguments.of(ZIP_FILE1, getPrefix(ZIP_FILE1), 13, false),
         Arguments.of(ZIP_FILE2, getPrefix(ZIP_FILE2), 13, false),
         Arguments.of(ZIP_FILE3, getPrefix(ZIP_FILE3), 13, false),
-        Arguments.of(ZIP_FILE4, getPrefix(ZIP_FILE4), 10, true)
-        );
+        Arguments.of(ZIP_FILE4, getPrefix(ZIP_FILE4), 10, true),
+        Arguments.of(ZIP_FILE5, getPrefix(ZIP_FILE5), 50, true)
+    );
   }
 
   private static Stream<Arguments> shouldFailWhenProvidedFileIsNotCompressed() {
     return Stream.of(
-        Arguments.of(NON_COMPRESSED_FILE)
+        Arguments.of(NON_COMPRESSED_FILE),
+        Arguments.of(UNSUPPORTED_TAR_BZ2)
     );
   }
 

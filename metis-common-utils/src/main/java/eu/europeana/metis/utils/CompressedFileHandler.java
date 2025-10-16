@@ -8,16 +8,20 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.lang.invoke.MethodHandles;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import org.apache.commons.compress.archivers.ArchiveEntry;
@@ -36,7 +40,7 @@ import org.slf4j.LoggerFactory;
  */
 public class CompressedFileHandler {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(CompressedFileHandler.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   private static final String MAC_TEMP_FOLDER = "__MACOSX";
   private static final String MAC_TEMP_FILE = ".DS_Store";
@@ -65,39 +69,57 @@ public class CompressedFileHandler {
     if (compressingExtension == null) {
       throw new IOException("Can't process archive of this type: " + compressedFile);
     }
-    extractInternal(compressedFile, destinationFolder);
+
+    extractIteratively(compressedFile, destinationFolder);
   }
 
-  private static void extractInternal(Path compressedFile, Path destinationFolder) throws IOException {
-    Path fileNameWithoutExtension = CompressedFileExtension.removeExtension(compressedFile.getFileName());
-    Path normalizedDestination;
+  private static void extractIteratively(Path rootArchive, Path destinationFolder) throws IOException {
+    record ArchiveAndDestination(Path archive, Path destination) {
 
-    // If destination already ends with the same name, don't append again
-    if (destinationFolder.getFileName() != null
-        && destinationFolder.getFileName().equals(fileNameWithoutExtension)) {
-      normalizedDestination = destinationFolder; // reuse
-    } else {
-      normalizedDestination = destinationFolder.resolve(fileNameWithoutExtension);
     }
 
-    Files.createDirectories(normalizedDestination);
+    Deque<ArchiveAndDestination> archiveQueue = new ArrayDeque<>();
+    archiveQueue.add(new ArchiveAndDestination(rootArchive, destinationFolder));
 
-    final List<Path> nestedArchives = new ArrayList<>();
+    while (!archiveQueue.isEmpty()) {
+      ArchiveAndDestination archiveAndDestination = archiveQueue.removeFirst();
+      Path currentArchive = archiveAndDestination.archive();
+      Path parentDestination = archiveAndDestination.destination();
 
-    try (InputStream inputStream = Files.newInputStream(compressedFile);
-        BufferedInputStream bufferedInputStream = new BufferedInputStream(inputStream);
-        ArchiveInputStream<?> archiveInputStream = createArchiveInputStream(bufferedInputStream, compressedFile)) {
+      Path fileNameWithoutExtension = CompressedFileExtension.removeExtension(currentArchive.getFileName());
+      Path normalizedDestination;
 
-      if (archiveInputStream == null) {
-        handleSingleCompressedFile(compressedFile, normalizedDestination);
-        return;
+      if (parentDestination.getFileName() != null &&
+          parentDestination.getFileName().equals(fileNameWithoutExtension)) {
+        normalizedDestination = parentDestination;
+      } else {
+        normalizedDestination = parentDestination.resolve(fileNameWithoutExtension);
       }
-      nestedArchives.addAll(extractEntriesAndReturnNestedArchives(archiveInputStream, normalizedDestination));
+
+      Files.createDirectories(normalizedDestination);
+
+      try (InputStream inputStream = Files.newInputStream(currentArchive);
+          BufferedInputStream bufferedInputStream = new BufferedInputStream(inputStream);
+          ArchiveInputStream<?> archiveInputStream = createArchiveInputStream(bufferedInputStream, currentArchive)) {
+
+        if (archiveInputStream == null) {
+          Optional<Path> maybeNestedCompressed = handleSingleCompressedFile(currentArchive, normalizedDestination);
+          maybeNestedCompressed.ifPresent(p -> archiveQueue.add(new ArchiveAndDestination(p, p.getParent()))
+          );
+        } else {
+          List<Path> nestedArchives = extractEntriesAndReturnNestedArchives(archiveInputStream, normalizedDestination);
+          for (Path nested : nestedArchives) {
+            archiveQueue.add(new ArchiveAndDestination(nested, nested.getParent()));
+          }
+        }
+      } catch (IOException e) {
+        throw new IOException("Error extracting archive: " + currentArchive, e);
+      }
+      if (!currentArchive.equals(rootArchive)) {
+        cleanupIntermediateFile(currentArchive);
+      }
     }
-
-    extractNestedArchives(nestedArchives);
   }
-
 
   private static ArchiveInputStream<?> createArchiveInputStream(BufferedInputStream bis, Path compressedFile) {
     try {
@@ -179,17 +201,11 @@ public class CompressedFileHandler {
     }
   }
 
-  private static void extractNestedArchives(List<Path> nestedArchives) throws IOException {
-    for (Path nested : nestedArchives) {
-      extractInternal(nested, nested.getParent());
-    }
-  }
-
   private static boolean skipMacFiles(ArchiveEntry entry) {
     return entry.getName().startsWith(MAC_TEMP_FOLDER) || entry.getName().endsWith(MAC_TEMP_FILE);
   }
 
-  private static void handleSingleCompressedFile(Path compressedFile, Path destinationFolder)
+  private static Optional<Path> handleSingleCompressedFile(Path compressedFile, Path destinationFolder)
       throws IOException {
 
     Path outFile = CompressedFileExtension
@@ -201,17 +217,19 @@ public class CompressedFileHandler {
         BufferedInputStream bis = new BufferedInputStream(fis);
         InputStream cis = new CompressorStreamFactory().createCompressorInputStream(bis);
         OutputStream out = Files.newOutputStream(outFile)) {
+
       IOUtils.copy(cis, out);
 
       if (CompressedFileExtension.hasCompressedFileExtension(outFile.toString())) {
-        extractInternal(outFile, outFile.getParent());
-        cleanupIntermediateFile(outFile);
+        // Return this path for the outer loop to process it later
+        return Optional.of(outFile);
       }
 
     } catch (CompressorException e) {
-      LOGGER.debug("File {} is not a recognized compressed format: {}, probably we reached a leaf regular file", compressedFile,
-          e.getMessage());
+      LOGGER.debug("File {} is not a recognized compressed format: {}", compressedFile, e.getMessage());
     }
+
+    return Optional.empty();
   }
 
   private static void cleanupIntermediateFile(Path outFile) {
