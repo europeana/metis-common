@@ -44,7 +44,9 @@ public class CompressedFileHandler {
 
   private static final String MAC_TEMP_FOLDER = "__MACOSX";
   private static final String MAC_TEMP_FILE = ".DS_Store";
-  private static final int MAX_ENTRIES_PER_DIR = 2;
+  private static final int MAX_ENTRIES_PER_DIR = 10;
+  private static final int MAX_EXTRACTION_DEPTH = 10;
+
   public static final String FILE_NAME_BANNED_CHARACTERS = "% $:?&#<>|*," + Character.MIN_VALUE;
 
   /**
@@ -73,24 +75,25 @@ public class CompressedFileHandler {
     extractIteratively(compressedFile, destinationFolder);
   }
 
-  private static void extractIteratively(Path rootArchive, Path destinationFolder) throws IOException {
-    record ArchiveAndDestination(Path archive, Path destination) {
+  record ArchiveAndDestination(Path archive, Path destination, int depth) {
 
-    }
+  }
+
+  private static void extractIteratively(Path rootArchive, Path destinationFolder) throws IOException {
 
     Deque<ArchiveAndDestination> archiveQueue = new ArrayDeque<>();
-    archiveQueue.add(new ArchiveAndDestination(rootArchive, destinationFolder));
+    archiveQueue.add(new ArchiveAndDestination(rootArchive, destinationFolder, 0));
 
     while (!archiveQueue.isEmpty()) {
       ArchiveAndDestination archiveAndDestination = archiveQueue.removeFirst();
       Path currentArchive = archiveAndDestination.archive();
       Path parentDestination = archiveAndDestination.destination();
+      int depth = archiveAndDestination.depth();
 
       Path fileNameWithoutExtension = CompressedFileExtension.removeExtension(currentArchive.getFileName());
       Path normalizedDestination;
 
-      if (parentDestination.getFileName() != null &&
-          parentDestination.getFileName().equals(fileNameWithoutExtension)) {
+      if (parentDestination.getFileName() != null && parentDestination.getFileName().equals(fileNameWithoutExtension)) {
         normalizedDestination = parentDestination;
       } else {
         normalizedDestination = parentDestination.resolve(fileNameWithoutExtension);
@@ -98,25 +101,23 @@ public class CompressedFileHandler {
 
       Files.createDirectories(normalizedDestination);
 
+      // Skip if depth limit reached
+      if (depth >= MAX_EXTRACTION_DEPTH) {
+        LOGGER.warn("Max extraction depth ({}) reached at: {} — skipping deeper extraction",
+            MAX_EXTRACTION_DEPTH, currentArchive);
+        Files.deleteIfExists(currentArchive);
+        continue;
+      }
+
       try (InputStream inputStream = Files.newInputStream(currentArchive);
           BufferedInputStream bufferedInputStream = new BufferedInputStream(inputStream);
           ArchiveInputStream<?> archiveInputStream = createArchiveInputStream(bufferedInputStream, currentArchive)) {
-
-        if (archiveInputStream == null) {
-          Optional<Path> maybeNestedCompressed = handleSingleCompressedFile(currentArchive, normalizedDestination);
-          maybeNestedCompressed.ifPresent(p -> archiveQueue.add(new ArchiveAndDestination(p, p.getParent()))
-          );
-        } else {
-          List<Path> nestedArchives = extractEntriesAndReturnNestedArchives(archiveInputStream, normalizedDestination);
-          for (Path nested : nestedArchives) {
-            archiveQueue.add(new ArchiveAndDestination(nested, nested.getParent()));
-          }
-        }
+        handleArchive(archiveInputStream, currentArchive, normalizedDestination, archiveQueue, depth);
       } catch (IOException e) {
         throw new IOException("Error extracting archive: " + currentArchive, e);
       }
       if (!currentArchive.equals(rootArchive)) {
-        cleanupIntermediateFile(currentArchive);
+        Files.deleteIfExists(currentArchive);
       }
     }
   }
@@ -128,6 +129,47 @@ public class CompressedFileHandler {
       LOGGER.debug("File {} is not a recognized archive format: {}", compressedFile, e.getMessage());
       return null;
     }
+  }
+
+  private static void handleArchive(ArchiveInputStream<?> archiveInputStream, Path currentArchive, Path normalizedDestination,
+      Deque<ArchiveAndDestination> archiveQueue, int depth) throws IOException {
+    if (archiveInputStream == null) {
+      Optional<Path> maybeNestedCompressed = handleSingleCompressedFile(currentArchive, normalizedDestination);
+      maybeNestedCompressed.ifPresent(p ->
+          archiveQueue.add(new ArchiveAndDestination(p, p.getParent(), depth + 1))
+      );
+    } else {
+      List<Path> nestedArchives = extractEntriesAndReturnNestedArchives(archiveInputStream, normalizedDestination);
+      nestedArchives.stream().map(nested -> new ArchiveAndDestination(nested, nested.getParent(), depth + 1))
+                    .forEach(archiveQueue::add);
+    }
+  }
+
+  private static Optional<Path> handleSingleCompressedFile(Path compressedFile, Path destinationFolder)
+      throws IOException {
+
+    Path outFile = CompressedFileExtension
+        .removeAndNormalizeLastExtension(destinationFolder.resolve(compressedFile.getFileName()));
+
+    Files.createDirectories(outFile.getParent());
+
+    try (InputStream fis = Files.newInputStream(compressedFile);
+        BufferedInputStream bis = new BufferedInputStream(fis);
+        InputStream cis = new CompressorStreamFactory().createCompressorInputStream(bis);
+        OutputStream out = Files.newOutputStream(outFile)) {
+
+      IOUtils.copy(cis, out);
+
+      if (CompressedFileExtension.hasCompressedFileExtension(outFile.toString())) {
+        // Return this path for the outer loop to process it later
+        return Optional.of(outFile);
+      }
+
+    } catch (CompressorException e) {
+      LOGGER.debug("File {} is not a recognized compressed format: {}", compressedFile, e.getMessage());
+    }
+
+    return Optional.empty();
   }
 
   private static List<Path> extractEntriesAndReturnNestedArchives(
@@ -188,56 +230,15 @@ public class CompressedFileHandler {
   }
 
 
-  private static void createDirectories(Path path) throws IOException {
-    if (Files.notExists(path)) {
-      Files.createDirectories(path);
-    }
-  }
-
   private static void createParentDirectories(Path path) throws IOException {
     Path parent = path.getParent();
     if (parent != null) {
-      createDirectories(parent);
+      Files.createDirectories(parent);
     }
   }
 
   private static boolean skipMacFiles(ArchiveEntry entry) {
     return entry.getName().startsWith(MAC_TEMP_FOLDER) || entry.getName().endsWith(MAC_TEMP_FILE);
-  }
-
-  private static Optional<Path> handleSingleCompressedFile(Path compressedFile, Path destinationFolder)
-      throws IOException {
-
-    Path outFile = CompressedFileExtension
-        .removeAndNormalizeLastExtension(destinationFolder.resolve(compressedFile.getFileName()));
-
-    Files.createDirectories(outFile.getParent());
-
-    try (InputStream fis = Files.newInputStream(compressedFile);
-        BufferedInputStream bis = new BufferedInputStream(fis);
-        InputStream cis = new CompressorStreamFactory().createCompressorInputStream(bis);
-        OutputStream out = Files.newOutputStream(outFile)) {
-
-      IOUtils.copy(cis, out);
-
-      if (CompressedFileExtension.hasCompressedFileExtension(outFile.toString())) {
-        // Return this path for the outer loop to process it later
-        return Optional.of(outFile);
-      }
-
-    } catch (CompressorException e) {
-      LOGGER.debug("File {} is not a recognized compressed format: {}", compressedFile, e.getMessage());
-    }
-
-    return Optional.empty();
-  }
-
-  private static void cleanupIntermediateFile(Path outFile) {
-    try {
-      Files.deleteIfExists(outFile);
-    } catch (IOException e) {
-      LOGGER.warn("Could not delete intermediate archive {}: {}", outFile, e.getMessage());
-    }
   }
 
   private static String replaceBannedCharacters(String entryName) {
