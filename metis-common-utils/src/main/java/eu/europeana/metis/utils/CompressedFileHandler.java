@@ -35,10 +35,55 @@ public class CompressedFileHandler {
 
   private static final String MAC_TEMP_FOLDER = "__MACOSX";
   private static final String MAC_TEMP_FILE = ".DS_Store";
-  private static final int MAX_ENTRIES_PER_DIR = 10;
-  private static final int MAX_EXTRACTION_DEPTH = 10;
+  private static final int DEFAULT_MAX_EXTRACTION_DEPTH = 10;
+  private static final int DEFAULT_MAX_ENTRIES_PER_DIR = 2;
 
   public static final String FILE_NAME_BANNED_CHARACTERS = "% $:?&#<>|*," + Character.MIN_VALUE;
+  public static final String PARTITION_PREFIX = "part_";
+
+  private final int maxExtractionDepth;
+  private final int maxEntriesPerDir;
+
+  /**
+   * Default constructor for the CompressedFileHandler class. Initializes the instance with default values for maximum extraction
+   * depth and maximum entries per directory, as defined by DEFAULT_MAX_EXTRACTION_DEPTH and DEFAULT_MAX_ENTRIES_PER_DIR
+   * constants.
+   */
+  public CompressedFileHandler() {
+    this(DEFAULT_MAX_EXTRACTION_DEPTH, DEFAULT_MAX_ENTRIES_PER_DIR);
+  }
+
+  /**
+   * Constructs a new instance of the CompressedFileHandler class with specific limits for maximum extraction depth and maximum
+   * entries per directory.
+   *
+   * @param maxExtractionDepth the maximum depth to which files can be extracted from nested archives
+   * @param maxEntriesPerDir the maximum number of entries that can be extracted into a single directory
+   */
+  public CompressedFileHandler(int maxExtractionDepth, int maxEntriesPerDir) {
+    this.maxExtractionDepth = maxExtractionDepth;
+    this.maxEntriesPerDir = maxEntriesPerDir;
+  }
+
+  /**
+   * Extract a file from a compressed file/archive.
+   * <p>
+   * Supports extraction of files from compressed files/archives.
+   * <p>
+   * The extraction is based on the apache common compress library and is generic to support all files that that library
+   * supports.
+   * <p>
+   * We do though limit the support using what we have defined in the {@link CompressedFileExtension} enum.
+   *
+   * @param compressedFile The compressed file.
+   * @param destinationFolder The destination folder.
+   * @throws IOException If there was a problem with the extraction.
+   * @deprecated Use Constructor and then {@link #extract(Path, Path)} instead.
+   */
+  @Deprecated(since = "17", forRemoval = true)
+  public static void extractFile(Path compressedFile, Path destinationFolder) throws IOException {
+    new CompressedFileHandler().extract(compressedFile, destinationFolder);
+  }
 
   /**
    * Extract a file from a compressed file/archive.
@@ -54,7 +99,7 @@ public class CompressedFileHandler {
    * @param destinationFolder The destination folder.
    * @throws IOException If there was a problem with the extraction.
    */
-  public static void extractFile(Path compressedFile, Path destinationFolder) throws IOException {
+  public void extract(Path compressedFile, Path destinationFolder) throws IOException {
     Objects.requireNonNull(compressedFile, "compressedFile cannot be null");
     Objects.requireNonNull(destinationFolder, "destinationFolder cannot be null");
 
@@ -63,23 +108,22 @@ public class CompressedFileHandler {
       throw new IOException("Can't process archive of this type: " + compressedFile);
     }
 
-    extractIteratively(compressedFile, destinationFolder);
+    extractInternal(compressedFile, destinationFolder);
   }
 
-  record ArchiveAndDestination(Path archive, Path destination, int depth) {
+  record ArchiveContext(Path archive, Path destination, int depth) {
 
   }
 
-  private static void extractIteratively(Path rootArchive, Path destinationFolder) throws IOException {
-
-    Deque<ArchiveAndDestination> archiveQueue = new ArrayDeque<>();
-    archiveQueue.add(new ArchiveAndDestination(rootArchive, destinationFolder, 0));
+  private void extractInternal(Path rootArchive, Path destinationFolder) throws IOException {
+    Deque<ArchiveContext> archiveQueue = new ArrayDeque<>();
+    archiveQueue.add(new ArchiveContext(rootArchive, destinationFolder, 0));
 
     while (!archiveQueue.isEmpty()) {
-      ArchiveAndDestination archiveAndDestination = archiveQueue.removeFirst();
-      Path currentArchive = archiveAndDestination.archive();
-      Path parentDestination = archiveAndDestination.destination();
-      int depth = archiveAndDestination.depth();
+      ArchiveContext archiveContext = archiveQueue.removeFirst();
+      Path currentArchive = archiveContext.archive();
+      Path parentDestination = archiveContext.destination();
+      int depth = archiveContext.depth();
 
       Path fileNameWithoutExtension = CompressedFileExtension.removeExtension(currentArchive.getFileName());
       Path normalizedDestination;
@@ -92,28 +136,25 @@ public class CompressedFileHandler {
 
       Files.createDirectories(normalizedDestination);
 
-      // Skip if depth limit reached
-      if (depth >= MAX_EXTRACTION_DEPTH) {
-        LOGGER.warn("Max extraction depth ({}) reached at: {} — skipping deeper extraction",
-            MAX_EXTRACTION_DEPTH, currentArchive);
-        Files.deleteIfExists(currentArchive);
-        continue;
+      if (depth < maxExtractionDepth) {
+        try (InputStream inputStream = Files.newInputStream(currentArchive);
+            BufferedInputStream bufferedInputStream = new BufferedInputStream(inputStream);
+            ArchiveInputStream<?> archiveInputStream = createArchiveInputStream(bufferedInputStream, currentArchive)) {
+          handleArchive(archiveInputStream, currentArchive, normalizedDestination, archiveQueue, depth);
+        } catch (IOException e) {
+          throw new IOException("Error extracting archive: " + currentArchive, e);
+        }
+      } else {
+        LOGGER.warn("Max extraction depth ({}) reached at: {} — skipping deeper extraction", maxExtractionDepth, currentArchive);
       }
 
-      try (InputStream inputStream = Files.newInputStream(currentArchive);
-          BufferedInputStream bufferedInputStream = new BufferedInputStream(inputStream);
-          ArchiveInputStream<?> archiveInputStream = createArchiveInputStream(bufferedInputStream, currentArchive)) {
-        handleArchive(archiveInputStream, currentArchive, normalizedDestination, archiveQueue, depth);
-      } catch (IOException e) {
-        throw new IOException("Error extracting archive: " + currentArchive, e);
-      }
       if (!currentArchive.equals(rootArchive)) {
         Files.deleteIfExists(currentArchive);
       }
     }
   }
 
-  private static ArchiveInputStream<?> createArchiveInputStream(BufferedInputStream bis, Path compressedFile) {
+  private ArchiveInputStream<?> createArchiveInputStream(BufferedInputStream bis, Path compressedFile) {
     try {
       return new ArchiveStreamFactory().createArchiveInputStream(bis);
     } catch (ArchiveException e) {
@@ -122,22 +163,21 @@ public class CompressedFileHandler {
     }
   }
 
-  private static void handleArchive(ArchiveInputStream<?> archiveInputStream, Path currentArchive, Path normalizedDestination,
-      Deque<ArchiveAndDestination> archiveQueue, int depth) throws IOException {
+  private void handleArchive(ArchiveInputStream<?> archiveInputStream, Path currentArchive, Path normalizedDestination,
+      Deque<ArchiveContext> archiveQueue, int depth) throws IOException {
     if (archiveInputStream == null) {
       Optional<Path> maybeNestedCompressed = handleSingleCompressedFile(currentArchive, normalizedDestination);
       maybeNestedCompressed.ifPresent(p ->
-          archiveQueue.add(new ArchiveAndDestination(p, p.getParent(), depth + 1))
+          archiveQueue.add(new ArchiveContext(p, p.getParent(), depth + 1))
       );
     } else {
       List<Path> nestedArchives = extractEntriesAndReturnNestedArchives(archiveInputStream, normalizedDestination);
-      nestedArchives.stream().map(nested -> new ArchiveAndDestination(nested, nested.getParent(), depth + 1))
+      nestedArchives.stream().map(nested -> new ArchiveContext(nested, nested.getParent(), depth + 1))
                     .forEach(archiveQueue::add);
     }
   }
 
-  private static Optional<Path> handleSingleCompressedFile(Path compressedFile, Path destinationFolder)
-      throws IOException {
+  private Optional<Path> handleSingleCompressedFile(Path compressedFile, Path destinationFolder) throws IOException {
 
     Path outFile = CompressedFileExtension
         .removeAndNormalizeLastExtension(destinationFolder.resolve(compressedFile.getFileName()));
@@ -163,12 +203,12 @@ public class CompressedFileHandler {
     return Optional.empty();
   }
 
-  private static List<Path> extractEntriesAndReturnNestedArchives(
-      ArchiveInputStream<?> archiveInputStream, Path destinationFolder) throws IOException {
+  private List<Path> extractEntriesAndReturnNestedArchives(ArchiveInputStream<?> archiveInputStream, Path destinationFolder)
+      throws IOException {
 
     List<Path> nestedArchives = new ArrayList<>();
-    Map<Path, Integer> entryCountersForPath = new HashMap<>();
-    // Maps original (logical) directory to its relocated (partitioned) physical path
+    Map<Path, Integer> entriesCounterPerPath = new HashMap<>();
+    // Maps the original (logical) directory to its relocated (partitioned) physical path
     Map<Path, Path> relocatedParents = new HashMap<>();
     relocatedParents.put(destinationFolder, destinationFolder); // identity for root
 
@@ -178,26 +218,24 @@ public class CompressedFileHandler {
         continue;
       }
 
-      String rawEntryName = replaceBannedCharacters(entry.getName());
-      Path safePath = zipSlipVulnerabilityProtect(rawEntryName, destinationFolder);
+      String sanitizedEntryName = replaceBannedCharacters(entry.getName());
+      Path logicalPath = resolveAndValidateEntry(sanitizedEntryName, destinationFolder);
 
-      // The directory that *logically* contains this entry (unpartitioned path)
-      Path logicalParent = (safePath.getParent() != null) ? safePath.getParent() : destinationFolder;
+      Path logicalParent = (logicalPath.getParent() != null) ? logicalPath.getParent() : destinationFolder;
       // Where that logical parent was actually created (possibly under part_X/…)
       Path mappedParent = relocatedParents.getOrDefault(logicalParent, logicalParent);
 
-      // Determine the partition bucket under the *mapped* parent
-      Path partitionedParent = getPartitionedParent(mappedParent, entryCountersForPath);
-      Path entryPath = partitionedParent.resolve(safePath.getFileName());
+      Path partitionedParent = getPartitionedParent(mappedParent, entriesCounterPerPath);
+      Path entryPath = partitionedParent.resolve(logicalPath.getFileName());
 
       boolean isDirectory = entry.isDirectory();
       if (isDirectory) {
         // Create the relocated directory and remember its new physical path
         Files.createDirectories(entryPath);
-        relocatedParents.put(safePath, entryPath);
+        relocatedParents.put(logicalPath, entryPath);
       } else {
         extractFileEntry(archiveInputStream, entryPath);
-        if (CompressedFileExtension.hasCompressedFileExtension(rawEntryName)) {
+        if (CompressedFileExtension.hasCompressedFileExtension(sanitizedEntryName)) {
           nestedArchives.add(entryPath);
         }
       }
@@ -206,38 +244,37 @@ public class CompressedFileHandler {
     return nestedArchives;
   }
 
-  private static Path getPartitionedParent(Path parentDir, Map<Path, Integer> counters) throws IOException {
-    int index = counters.compute(parentDir, (k, v) -> (v == null) ? 0 : (v + 1));
-    int partitionNumber = index / MAX_ENTRIES_PER_DIR;
-    Path partitionDir = parentDir.resolve("part_" + partitionNumber);
+  private Path getPartitionedParent(Path parentDir, Map<Path, Integer> counters) throws IOException {
+    int index = counters.merge(parentDir, 0, (oldVal, newVal) -> oldVal + 1);
+    int partitionNumber = index / maxEntriesPerDir;
+    Path partitionDir = parentDir.resolve(PARTITION_PREFIX + partitionNumber);
     Files.createDirectories(partitionDir);
     return partitionDir;
   }
 
-  private static void extractFileEntry(ArchiveInputStream<?> ais, Path entryPath)
+  private void extractFileEntry(ArchiveInputStream<?> ais, Path entryPath)
       throws IOException {
     createParentDirectories(entryPath);
     Files.copy(ais, entryPath, StandardCopyOption.REPLACE_EXISTING);
   }
 
 
-  private static void createParentDirectories(Path path) throws IOException {
+  private void createParentDirectories(Path path) throws IOException {
     Path parent = path.getParent();
     if (parent != null) {
       Files.createDirectories(parent);
     }
   }
 
-  private static boolean skipMacFiles(ArchiveEntry entry) {
+  private boolean skipMacFiles(ArchiveEntry entry) {
     return entry.getName().startsWith(MAC_TEMP_FOLDER) || entry.getName().endsWith(MAC_TEMP_FILE);
   }
 
-  private static String replaceBannedCharacters(String entryName) {
+  private String replaceBannedCharacters(String entryName) {
     return entryName.replaceAll("[" + FILE_NAME_BANNED_CHARACTERS + "]", "_");
   }
 
-  private static Path zipSlipVulnerabilityProtect(String entryName, Path targetDir)
-      throws IOException {
+  private Path resolveAndValidateEntry(String entryName, Path targetDir) throws IOException {
     // https://snyk.io/research/zip-slip-vulnerability
     Path targetDirResolved = targetDir.resolve(entryName);
     // make sure the normalized file still has targetDir as its prefix else throw exception
