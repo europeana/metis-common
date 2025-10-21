@@ -9,7 +9,7 @@ import java.nio.file.Path;
 import java.util.Collection;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -26,14 +26,12 @@ public class CompressedFileHandlerGzTest {
   private static final String FILE_NAME3 = "gzFilesWithMixedCompressedFiles";
   private static final String FILE_NAME4 = "gzFileWithSubdirContainingSpaceInName";
   private static final String XML_TYPE = "xml";
-  private static final String DESTINATION_NAME_FOR_ZIP_WITH_SPACES = "zip_file";
 
-  @AfterAll
-  public static void cleanUp() throws IOException {
-    FileUtils.forceDelete(new File(DESTINATION_DIR + FILE_NAME));
-    FileUtils.forceDelete(new File(DESTINATION_DIR + FILE_NAME2));
-    FileUtils.forceDelete(new File(DESTINATION_DIR + FILE_NAME3));
-    FileUtils.forceDelete(new File(DESTINATION_DIR + DESTINATION_NAME_FOR_ZIP_WITH_SPACES));
+  @AfterEach
+  public void cleanUp() throws IOException {
+    for(File extractedDir:(new File(DESTINATION_DIR).listFiles((dir, name) ->name.startsWith("extracted-")))){
+      FileUtils.forceDelete(extractedDir);
+    }
   }
 
   private Collection<File> getXMLFiles(String folderLocation) {
@@ -43,7 +41,7 @@ public class CompressedFileHandlerGzTest {
   @Test
   void shouldUnpackTheTarGzFilesRecursively() throws IOException {
     CompressedFileHandler.extractFile(Path.of(DESTINATION_DIR + FILE_NAME + FILE_EXTENSION), Path.of(DESTINATION_DIR));
-    Collection<File> files = getXMLFiles(DESTINATION_DIR + FILE_NAME);
+    Collection<File> files = getXMLFiles(DESTINATION_DIR );
     assertNotNull(files);
     assertEquals(XML_FILES_COUNT, files.size());
   }
@@ -51,7 +49,7 @@ public class CompressedFileHandlerGzTest {
   @Test
   void shouldUnpackTheTarGzFilesRecursivelyWithCompressedXMLFiles() throws IOException {
     CompressedFileHandler.extractFile(Path.of(DESTINATION_DIR + FILE_NAME2 + FILE_EXTENSION), Path.of(DESTINATION_DIR));
-    Collection<File> files = getXMLFiles(DESTINATION_DIR + FILE_NAME2);
+    Collection<File> files = getXMLFiles(DESTINATION_DIR);
     assertNotNull(files);
     assertEquals(XML_FILES_COUNT, files.size());
   }
@@ -59,7 +57,7 @@ public class CompressedFileHandlerGzTest {
   @Test
   void shouldUnpackTheTarGzFilesRecursivelyWithMixedNestedCompressedFiles() throws IOException {
     CompressedFileHandler.extractFile(Path.of(DESTINATION_DIR + FILE_NAME3 + FILE_EXTENSION), Path.of(DESTINATION_DIR));
-    Collection<File> files = getXMLFiles(DESTINATION_DIR + FILE_NAME3);
+    Collection<File> files = getXMLFiles(DESTINATION_DIR);
     assertNotNull(files);
     assertEquals(XML_FILES_COUNT, files.size());
   }
@@ -69,7 +67,7 @@ public class CompressedFileHandlerGzTest {
     CompressedFileHandler.extractFile(Path.of(DESTINATION_DIR + FILE_NAME4 + FILE_EXTENSION),
         Path.of(DESTINATION_DIR));
 
-    Collection<File> files = getXMLFiles(DESTINATION_DIR + DESTINATION_NAME_FOR_ZIP_WITH_SPACES);
+    Collection<File> files = getXMLFiles(DESTINATION_DIR);
     assertNotNull(files);
     assertEquals(10, files.size());
     files.forEach(file -> assertEquals(
@@ -82,7 +80,7 @@ public class CompressedFileHandlerGzTest {
     CompressedFileHandler.extractFile(Path.of(DESTINATION_DIR + "tarFileWithSubdirContainingSpaceInName.tar"),
         Path.of(DESTINATION_DIR));
 
-    Collection<File> files = getXMLFiles(DESTINATION_DIR + DESTINATION_NAME_FOR_ZIP_WITH_SPACES);
+    Collection<File> files = getXMLFiles(DESTINATION_DIR);
     assertNotNull(files);
     assertEquals(10, files.size());
     files.forEach(file -> assertEquals(

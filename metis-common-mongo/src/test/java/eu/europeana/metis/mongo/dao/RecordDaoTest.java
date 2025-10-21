@@ -193,7 +193,7 @@ class RecordDaoTest {
         new String[]{"1,1,1"}, ImageOrientation.LANDSCAPE);
     final VideoMetaInfoImpl videoMetaInfo = new VideoMetaInfoImpl(256, 256, 3600L, "video/mp4", 50.00, 8194L, "mp4", "1080p", 8);
     final TextMetaInfoImpl textMetaInfo = new TextMetaInfoImpl("docx", 2048L, 600, true, "book");
-    final ThreeDMetaInfoImpl threeDMetaInfo = new ThreeDMetaInfoImpl("model/obj", 2048L);
+    final ThreeDMetaInfoImpl threeDMetaInfo = new ThreeDMetaInfoImpl("model/obj", 2048L, 92L, 48L, 24L);
     return new WebResourceMetaInfoImpl("51eec080f582833f264dad08", imageMetaInfo, audioMetaInfo, videoMetaInfo, textMetaInfo, threeDMetaInfo);
   }
 
