@@ -71,7 +71,8 @@ class CompressedFileHandlerTest {
       boolean checkBannedChars) throws IOException {
     Path compressedFile = DESTINATION_DIR.resolve(fileName);
 
-    CompressedFileHandler.extractFile(compressedFile, DESTINATION_DIR);
+    CompressedFileHandler compressedFileHandler = new CompressedFileHandler(10, 2);
+    compressedFileHandler.extract(compressedFile, DESTINATION_DIR);
 
     Collection<File> files = FileUtils.listFiles(
         DESTINATION_DIR.resolve(outputDir).toFile(), new String[]{XML_TYPE}, true);
@@ -90,8 +91,8 @@ class CompressedFileHandlerTest {
   @ParameterizedTest(name = "Expect failure for non-compressed file: {0}")
   @MethodSource
   void shouldFailWhenProvidedFileIsNotCompressed(String fileName) {
-    Assertions.assertThrows(IOException.class, () ->
-        CompressedFileHandler.extractFile(DESTINATION_DIR.resolve(fileName), DESTINATION_DIR));
+    Assertions.assertThrows(IOException.class,
+        () -> new CompressedFileHandler().extract(DESTINATION_DIR.resolve(fileName), DESTINATION_DIR));
   }
 
   private static Stream<Arguments> shouldExtractCompressedFilesRecursively() {
@@ -121,5 +122,28 @@ class CompressedFileHandlerTest {
 
   private static String getPrefix(String fileName) {
     return fileName.substring(0, fileName.indexOf("."));
+  }
+
+  @ParameterizedTest
+  @MethodSource
+  void testConvertPartitionedPathToOriginal(Path input, Path expected) {
+    assertEquals(expected, CompressedFileHandler.convertPartitionedPathToOriginal(input));
+  }
+
+  private static Stream<Arguments> testConvertPartitionedPathToOriginal() {
+    return Stream.of(
+        Arguments.of(
+            Path.of("directory1/part_0/file.txt"),
+            Path.of("directory1/file.txt")
+        ),
+        Arguments.of(
+            Path.of("directory1/part_0/directory2/part_1/file1.txt"),
+            Path.of("directory1/directory2/file1.txt")
+        ),
+        Arguments.of(
+            Path.of("gzFile/part_0/gzFile/part_1/xml/part_0/xml/part_0/anotherZip/part_0/anotherZip/part_0/jedit-4.5.0.xml"),
+            Path.of("gzFile/gzFile/xml/xml/anotherZip/anotherZip/jedit-4.5.0.xml")
+        )
+    );
   }
 }

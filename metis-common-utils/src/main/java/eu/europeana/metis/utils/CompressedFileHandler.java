@@ -36,7 +36,7 @@ public class CompressedFileHandler {
   private static final String MAC_TEMP_FOLDER = "__MACOSX";
   private static final String MAC_TEMP_FILE = ".DS_Store";
   private static final int DEFAULT_MAX_EXTRACTION_DEPTH = 10;
-  private static final int DEFAULT_MAX_ENTRIES_PER_DIR = 2;
+  private static final int DEFAULT_MAX_ENTRIES_PER_DIR = 10000;
 
   public static final String FILE_NAME_BANNED_CHARACTERS = "% $:?&#<>|*," + Character.MIN_VALUE;
   public static final String PARTITION_PREFIX = "part_";
@@ -252,12 +252,41 @@ public class CompressedFileHandler {
     return partitionDir;
   }
 
+  /**
+   * Converts a partitioned file path into its original non-partitioned form by removing artificial partition directories prefixed
+   * with a specific keyword and occurring at odd positions within the path structure.
+   * <p>
+   * The provided partitionedPath is expected to be a relative and a normalized path as well as the result.
+   * <p>
+   *
+   * @param partitionedPath the partitioned path to convert; must not be null
+   * @return the original path reconstructed by filtering out artificial partition directories
+   * @throws NullPointerException if the given partitionedPath is null
+   */
+  public static Path convertPartitionedPathToOriginal(Path partitionedPath) {
+    Objects.requireNonNull(partitionedPath, "partitionedPath cannot be null");
+
+    List<String> originalPathParts = new ArrayList<>();
+
+    int index = 0;
+    for (Path part : partitionedPath.normalize()) {
+      String name = part.getFileName().toString();
+
+      // Remove artificial partition directories that occur at odd positions
+      if (!(name.startsWith(PARTITION_PREFIX) && index % 2 == 1)) {
+        originalPathParts.add(name);
+      }
+      index++;
+    }
+
+    return Path.of("", originalPathParts.toArray(String[]::new));
+  }
+
   private void extractFileEntry(ArchiveInputStream<?> ais, Path entryPath)
       throws IOException {
     createParentDirectories(entryPath);
     Files.copy(ais, entryPath, StandardCopyOption.REPLACE_EXISTING);
   }
-
 
   private void createParentDirectories(Path path) throws IOException {
     Path parent = path.getParent();
