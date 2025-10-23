@@ -29,6 +29,14 @@ public final class TempFileUtils {
     //Private constructor
   }
 
+  public static Path createSecureDirectory(Path directory) throws IOException {
+    //Set permissions only to owner, posix style
+    Path secureDirectory = Files.createDirectory(directory, OWNER_PERMISSIONS_ONLY_FILE_ATTRIBUTE);
+    //Set again for non posix systems
+    setPosixIndependentOwnerOnlyFilePermissions(secureDirectory);
+    return secureDirectory;
+  }
+
   /**
    * Creates a secure temporary file(owner permissions only) for posix and other file systems.
    * <p>This method is not responsible of removing the temporary file.

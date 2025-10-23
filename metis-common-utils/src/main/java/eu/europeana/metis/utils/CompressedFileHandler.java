@@ -103,8 +103,8 @@ public class CompressedFileHandler {
     Objects.requireNonNull(compressedFile, "compressedFile cannot be null");
     Objects.requireNonNull(destinationFolder, "destinationFolder cannot be null");
 
-    final CompressedFileExtension compressingExtension = CompressedFileExtension.forPath(compressedFile);
-    if (compressingExtension == null) {
+    final CompressedFileExtension compressedFileExtension = CompressedFileExtension.forPath(compressedFile);
+    if (compressedFileExtension == null) {
       throw new IOException("Can't process archive of this type: " + compressedFile);
     }
 
