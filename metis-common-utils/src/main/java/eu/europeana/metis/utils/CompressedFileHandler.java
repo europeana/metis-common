@@ -296,7 +296,7 @@ public class CompressedFileHandler {
   }
 
   private boolean skipMacFiles(ArchiveEntry entry) {
-    return entry.getName().startsWith(MAC_TEMP_FOLDER) || entry.getName().endsWith(MAC_TEMP_FILE);
+    return entry.getName().contains(MAC_TEMP_FOLDER) || entry.getName().contains(MAC_TEMP_FILE);
   }
 
   private String replaceBannedCharacters(String entryName) {

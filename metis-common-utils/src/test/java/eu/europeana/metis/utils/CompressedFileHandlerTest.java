@@ -40,6 +40,7 @@ class CompressedFileHandlerTest {
   private static final String ZIP_FILE3 = "ZipFilesWithMixedCompressedFiles.zip";
   private static final String ZIP_FILE4 = "zipFileWithSubdirContainingSpaceInName.zip";
   private static final String ZIP_FILE5 = "zipWithDirectories.zip";
+  private static final String ZIP_FILE6 = "zipFileFromMac.zip";
 
   @AfterEach
   void cleanUp() {
@@ -53,7 +54,8 @@ class CompressedFileHandlerTest {
               getPrefix(ZIP_FILE2),
               getPrefix(ZIP_FILE3),
               getPrefix(ZIP_FILE4),
-              getPrefix(ZIP_FILE5)
+              getPrefix(ZIP_FILE5),
+              getPrefix(ZIP_FILE6)
           ).map(name -> DESTINATION_DIR.resolve(name).toFile())
           .filter(File::exists)
           .forEach(file -> {
@@ -109,7 +111,8 @@ class CompressedFileHandlerTest {
         Arguments.of(ZIP_FILE2, getPrefix(ZIP_FILE2), 13, false),
         Arguments.of(ZIP_FILE3, getPrefix(ZIP_FILE3), 13, false),
         Arguments.of(ZIP_FILE4, getPrefix(ZIP_FILE4), 10, true),
-        Arguments.of(ZIP_FILE5, getPrefix(ZIP_FILE5), 50, true)
+        Arguments.of(ZIP_FILE5, getPrefix(ZIP_FILE5), 50, true),
+        Arguments.of(ZIP_FILE6, getPrefix(ZIP_FILE6), 13, true)
     );
   }
 
