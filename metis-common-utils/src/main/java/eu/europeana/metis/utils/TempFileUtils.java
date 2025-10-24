@@ -22,24 +22,29 @@ public final class TempFileUtils {
       PosixFilePermission.OWNER_WRITE, PosixFilePermission.OWNER_EXECUTE);
   private static final FileAttribute<Set<PosixFilePermission>> OWNER_PERMISSIONS_ONLY_FILE_ATTRIBUTE = PosixFilePermissions.asFileAttribute(
       OWNER_PERMISSIONS_ONLY_SET);
-  public static final String PNG_FILE_EXTENSION = ".png";
-  public static final String JPEG_FILE_EXTENSION = ".jpeg";
 
   private TempFileUtils() {
     //Private constructor
   }
 
+  /**
+   * Creates a secure file(owner permissions only) for posix and other file systems.
+   * <p>This method is not responsible for removing the temporary file.
+   * An implementation that uses this method should delete the temp files by itself.</p>
+   *
+   * @param directory the path of the directory to create
+   * @return the created secure directory path
+   * @throws IOException if the directory fails to be created
+   */
   public static Path createSecureDirectory(Path directory) throws IOException {
-    //Set permissions only to owner, posix style
     Path secureDirectory = Files.createDirectory(directory, OWNER_PERMISSIONS_ONLY_FILE_ATTRIBUTE);
-    //Set again for non posix systems
-    setPosixIndependentOwnerOnlyFilePermissions(secureDirectory);
+    applyOwnerOnlyPermissionsForNonPosix(secureDirectory);
     return secureDirectory;
   }
 
   /**
    * Creates a secure temporary file(owner permissions only) for posix and other file systems.
-   * <p>This method is not responsible of removing the temporary file.
+   * <p>This method is not responsible for removing the temporary file.
    * An implementation that uses this method should delete the temp files by itself.</p>
    *
    * @param prefix the prefix, (e.g. the class simple name that generates the temp file)
@@ -48,10 +53,8 @@ public final class TempFileUtils {
    * @throws IOException if the file failed to be created
    */
   public static Path createSecureTempFile(String prefix, String suffix) throws IOException {
-    //Set permissions only to owner, posix style
     final Path secureTempFile = Files.createTempFile(prefix, suffix, OWNER_PERMISSIONS_ONLY_FILE_ATTRIBUTE);
-    //Set again for non posix systems
-    setPosixIndependentOwnerOnlyFilePermissions(secureTempFile);
+    applyOwnerOnlyPermissionsForNonPosix(secureTempFile);
 
     return secureTempFile;
   }
@@ -73,7 +76,7 @@ public final class TempFileUtils {
    * @return the secure temporary file
    * @throws IOException if the file failed to be created
    */
-  @SuppressWarnings("java:S2308") //Delete on exit is intended here and javadoc warns the user
+  @SuppressWarnings("java:S2308") //Delete on exit is intended here, and Javadoc warns the user
   public static Path createSecureTempFileDeleteOnExit(String prefix, String suffix) throws IOException {
     final Path secureTempFile = createSecureTempFile(prefix, suffix);
     secureTempFile.toFile().deleteOnExit();
@@ -92,10 +95,8 @@ public final class TempFileUtils {
    */
   public static Path createSecureTempDirectoryAndFile(String directoryPrefix, String prefix, String suffix) throws IOException {
     Path tempSecureParentDir = createSecureTempDirectory(directoryPrefix);
-    //Set permissions only to owner, posix style
     final Path secureTempFile = Files.createTempFile(tempSecureParentDir, prefix, suffix, OWNER_PERMISSIONS_ONLY_FILE_ATTRIBUTE);
-    //Set again for non posix systems
-    setPosixIndependentOwnerOnlyFilePermissions(secureTempFile);
+    applyOwnerOnlyPermissionsForNonPosix(secureTempFile);
 
     return secureTempFile;
   }
@@ -108,17 +109,15 @@ public final class TempFileUtils {
    * @throws IOException if the directory failed to be created
    */
   public static Path createSecureTempDirectory(String prefix) throws IOException {
-    //Set permissions only to owner, posix style
     final Path secureTempFile = Files.createTempDirectory(prefix, OWNER_PERMISSIONS_ONLY_FILE_ATTRIBUTE);
-    //Set again for non posix systems
-    setPosixIndependentOwnerOnlyFilePermissions(secureTempFile);
+    applyOwnerOnlyPermissionsForNonPosix(secureTempFile);
 
     return secureTempFile;
   }
 
-  private static void setPosixIndependentOwnerOnlyFilePermissions(Path path) {
+  private static void applyOwnerOnlyPermissionsForNonPosix(Path path) {
     File file = path.toFile();
-    //Set again for non posix systems
+    //Set again for non-posix systems
     if (!(file.setReadable(true, true) && file.setWritable(true, true) && file.setExecutable(true, true))) {
       LOGGER.debug("Setting permissions failed on file {}", file.getAbsolutePath());
     }
