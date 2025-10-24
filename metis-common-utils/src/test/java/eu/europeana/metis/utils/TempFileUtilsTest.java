@@ -1,7 +1,7 @@
 package eu.europeana.metis.utils;
 
-import org.apache.commons.io.FileUtils;
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.nio.file.FileSystems;
@@ -10,9 +10,8 @@ import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermission;
 import java.util.EnumSet;
 import java.util.Set;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.apache.commons.io.FileUtils;
+import org.junit.jupiter.api.Test;
 
 class TempFileUtilsTest {
 
@@ -23,6 +22,14 @@ class TempFileUtilsTest {
     final Path secureTempFile = TempFileUtils.createSecureTempFile("prefix", "suffix");
     assertFilePermissions(secureTempFile);
     assertTrue(Files.deleteIfExists(secureTempFile));
+  }
+
+  @Test
+  void createSecureDirectory() throws IOException {
+    Path path = Path.of(System.getProperty("java.io.tmpdir"), TempFileUtilsTest.class.getSimpleName());
+    final Path secureTempDirectory = TempFileUtils.createSecureDirectory(path);
+    assertFilePermissions(secureTempDirectory);
+    FileUtils.deleteDirectory(secureTempDirectory.toFile());
   }
 
   @Test
