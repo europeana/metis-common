@@ -26,7 +26,7 @@ class TempFileUtilsTest {
 
   @Test
   void createSecureDirectory() throws IOException {
-    Path path = Path.of(System.getProperty("java.io.tmpdir"), TempFileUtilsTest.class.getSimpleName());
+    Path path = TempFileUtils.getDeterministicPathToTempDirectoryById(TempFileUtilsTest.class.getSimpleName());
     final Path secureTempDirectory = TempFileUtils.createSecureDirectory(path);
     assertFilePermissions(secureTempDirectory);
     FileUtils.deleteDirectory(secureTempDirectory.toFile());

@@ -28,6 +28,18 @@ public final class TempFileUtils {
   }
 
   /**
+   * Returns the path to a temporary destination directory for a given identifier.
+   * The directory path is constructed within the system's temporary directory
+   * and is uniquely tied to the provided identifier.
+   *
+   * @param id the unique identifier used to create the temporary destination directory path
+   * @return the {@link Path} object representing the temporary destination directory
+   */
+  public static Path getDeterministicPathToTempDirectoryById(String id) {
+    return Path.of(System.getProperty("java.io.tmpdir"), id);
+  }
+
+  /**
    * Creates a secure file(owner permissions only) for posix and other file systems.
    * <p>This method is not responsible for removing the temporary file.
    * An implementation that uses this method should delete the temp files by itself.</p>
