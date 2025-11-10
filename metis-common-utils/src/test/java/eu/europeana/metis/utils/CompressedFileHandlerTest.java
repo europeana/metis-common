@@ -24,9 +24,8 @@ class CompressedFileHandlerTest {
 
   private static final Path DESTINATION_DIR = Path.of("src", "test", "resources", "__files");
   private static final String XML_TYPE = "xml";
-  private static final String DESTINATION_NAME_FOR_ZIP_WITH_SPACES = "zip_file";
-  private static final String ZIP_EXTRACTION_DESTINATION_NAME = "zipFile";
   private static final String NON_COMPRESSED_FILE = "non_compressed_file.txt";
+  private static final String UNSUPPORTED_TAR_BZ2 = "archive.tar.bz2";
 
   // GZ/TAR test files
   private static final String TAR_GZ_FILE1 = "gzFile.tgz";
@@ -40,6 +39,8 @@ class CompressedFileHandlerTest {
   private static final String ZIP_FILE2 = "zipFileWithNestedFolders.zip";
   private static final String ZIP_FILE3 = "ZipFilesWithMixedCompressedFiles.zip";
   private static final String ZIP_FILE4 = "zipFileWithSubdirContainingSpaceInName.zip";
+  private static final String ZIP_FILE5 = "zipWithDirectories.zip";
+  private static final String ZIP_FILE6 = "zipFileFromMac.zip";
 
   @AfterEach
   void cleanUp() {
@@ -47,8 +48,14 @@ class CompressedFileHandlerTest {
               getPrefix(TAR_GZ_FILE1),
               getPrefix(TAR_GZ_FILE2),
               getPrefix(TAR_GZ_FILE3),
-              DESTINATION_NAME_FOR_ZIP_WITH_SPACES,
-              ZIP_EXTRACTION_DESTINATION_NAME
+              getPrefix(TAR_GZ_FILE4),
+              getPrefix(TAR_FILE),
+              getPrefix(ZIP_FILE1),
+              getPrefix(ZIP_FILE2),
+              getPrefix(ZIP_FILE3),
+              getPrefix(ZIP_FILE4),
+              getPrefix(ZIP_FILE5),
+              getPrefix(ZIP_FILE6)
           ).map(name -> DESTINATION_DIR.resolve(name).toFile())
           .filter(File::exists)
           .forEach(file -> {
@@ -66,7 +73,8 @@ class CompressedFileHandlerTest {
       boolean checkBannedChars) throws IOException {
     Path compressedFile = DESTINATION_DIR.resolve(fileName);
 
-    CompressedFileHandler.extractFile(compressedFile, DESTINATION_DIR);
+    CompressedFileHandler compressedFileHandler = new CompressedFileHandler(10, 2);
+    compressedFileHandler.extract(compressedFile, DESTINATION_DIR);
 
     Collection<File> files = FileUtils.listFiles(
         DESTINATION_DIR.resolve(outputDir).toFile(), new String[]{XML_TYPE}, true);
@@ -85,8 +93,8 @@ class CompressedFileHandlerTest {
   @ParameterizedTest(name = "Expect failure for non-compressed file: {0}")
   @MethodSource
   void shouldFailWhenProvidedFileIsNotCompressed(String fileName) {
-    Assertions.assertThrows(IOException.class, () ->
-        CompressedFileHandler.extractFile(DESTINATION_DIR.resolve(fileName), DESTINATION_DIR));
+    Assertions.assertThrows(IOException.class,
+        () -> new CompressedFileHandler().extract(DESTINATION_DIR.resolve(fileName), DESTINATION_DIR));
   }
 
   private static Stream<Arguments> shouldExtractCompressedFilesRecursively() {
@@ -95,24 +103,50 @@ class CompressedFileHandlerTest {
         Arguments.of(TAR_GZ_FILE1, getPrefix(TAR_GZ_FILE1), 13, false),
         Arguments.of(TAR_GZ_FILE2, getPrefix(TAR_GZ_FILE2), 13, false),
         Arguments.of(TAR_GZ_FILE3, getPrefix(TAR_GZ_FILE3), 13, false),
-        Arguments.of(TAR_GZ_FILE4, DESTINATION_NAME_FOR_ZIP_WITH_SPACES, 10, true),
-        Arguments.of(TAR_FILE, DESTINATION_NAME_FOR_ZIP_WITH_SPACES, 10, true),
+        Arguments.of(TAR_GZ_FILE4, getPrefix(TAR_GZ_FILE4), 10, true),
+        Arguments.of(TAR_FILE, getPrefix(TAR_FILE), 10, true),
 
         // ZIP tests
-        Arguments.of(ZIP_FILE1, ZIP_EXTRACTION_DESTINATION_NAME, 13, false),
-        Arguments.of(ZIP_FILE2, ZIP_EXTRACTION_DESTINATION_NAME, 13, false),
-        Arguments.of(ZIP_FILE3, ZIP_EXTRACTION_DESTINATION_NAME, 13, false),
-        Arguments.of(ZIP_FILE4, DESTINATION_NAME_FOR_ZIP_WITH_SPACES, 10, true)
+        Arguments.of(ZIP_FILE1, getPrefix(ZIP_FILE1), 13, false),
+        Arguments.of(ZIP_FILE2, getPrefix(ZIP_FILE2), 13, false),
+        Arguments.of(ZIP_FILE3, getPrefix(ZIP_FILE3), 13, false),
+        Arguments.of(ZIP_FILE4, getPrefix(ZIP_FILE4), 10, true),
+        Arguments.of(ZIP_FILE5, getPrefix(ZIP_FILE5), 50, true),
+        Arguments.of(ZIP_FILE6, getPrefix(ZIP_FILE6), 13, true)
     );
   }
 
   private static Stream<Arguments> shouldFailWhenProvidedFileIsNotCompressed() {
     return Stream.of(
-        Arguments.of(NON_COMPRESSED_FILE)
+        Arguments.of(NON_COMPRESSED_FILE),
+        Arguments.of(UNSUPPORTED_TAR_BZ2)
     );
   }
 
   private static String getPrefix(String fileName) {
     return fileName.substring(0, fileName.indexOf("."));
+  }
+
+  @ParameterizedTest
+  @MethodSource
+  void testConvertPartitionedPathToOriginal(Path input, Path expected) {
+    assertEquals(expected, CompressedFileHandler.convertPartitionedPathToOriginal(input));
+  }
+
+  private static Stream<Arguments> testConvertPartitionedPathToOriginal() {
+    return Stream.of(
+        Arguments.of(
+            Path.of("directory1/part_0/file.txt"),
+            Path.of("directory1/file.txt")
+        ),
+        Arguments.of(
+            Path.of("directory1/part_0/directory2/part_1/file1.txt"),
+            Path.of("directory1/directory2/file1.txt")
+        ),
+        Arguments.of(
+            Path.of("gzFile/part_0/gzFile/part_1/xml/part_0/xml/part_0/anotherZip/part_0/anotherZip/part_0/jedit-4.5.0.xml"),
+            Path.of("gzFile/gzFile/xml/xml/anotherZip/anotherZip/jedit-4.5.0.xml")
+        )
+    );
   }
 }
