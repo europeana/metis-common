@@ -36,12 +36,13 @@
 
     <!--Internal-->
     <version.metis-schema>13-SNAPSHOT</version.metis-schema>
-    <version.corelib>2.17.5-SNAPSHOT</version.corelib>
+    <version.corelib>2.17.5</version.corelib>
 
     <!--External-->
     <version.spring>6.1.5</version.spring>
     <version.spring.boot>3.2.3</version.spring.boot>
-    <version.apache.httpclient>5.3.1</version.apache.httpclient>
+    <version.apache.httpclient5>5.4.1</version.apache.httpclient5>
+    <version.apache.httpcore5>5.3.1</version.apache.httpcore5>
     <version.jakarta.ws.rs.api>3.1.0</version.jakarta.ws.rs.api>
     <version.elastic.apm>1.48.1</version.elastic.apm>
     <version.commons-compress>1.26.0</version.commons-compress>
