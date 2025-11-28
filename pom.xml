@@ -36,7 +36,7 @@
 
     <!--Internal-->
     <version.metis-schema>13-SNAPSHOT</version.metis-schema>
-    <version.corelib>2.17.5</version.corelib>
+    <version.corelib>2.17.6-SNAPSHOT</version.corelib>
 
     <!--External-->
     <version.spring>6.1.5</version.spring>
