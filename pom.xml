@@ -40,13 +40,13 @@
 
     <!--External-->
     <version.spring>6.1.5</version.spring>
-    <version.spring.boot>3.2.3</version.spring.boot>
+    <version.spring.boot>3.4.10</version.spring.boot>
     <version.apache.httpclient5>5.4.1</version.apache.httpclient5>
     <version.apache.httpcore5>5.3.1</version.apache.httpcore5>
     <version.jakarta.ws.rs.api>3.1.0</version.jakarta.ws.rs.api>
     <version.elastic.apm>1.48.1</version.elastic.apm>
     <version.commons-compress>1.26.0</version.commons-compress>
-    <version.morphia.core>2.4.5</version.morphia.core>
+    <version.morphia.core>2.5.1</version.morphia.core>
     <version.jackson>2.16.1</version.jackson>
     <version.solr.solrj>8.8.2</version.solr.solrj>
     <version.jersey>3.1.5</version.jersey>
@@ -56,7 +56,7 @@
     <version.jetbrains>24.0.1</version.jetbrains>
     <version.embedded.mongo>4.18.1</version.embedded.mongo>
     <version.mockito.core>4.3.1</version.mockito.core>
-    <version.junit>5.10.2</version.junit>
+    <version.junit>5.11.4</version.junit>
     <version.log4j>2.23.0</version.log4j>
     <version.slf4j>2.0.12</version.slf4j>
   </properties>
