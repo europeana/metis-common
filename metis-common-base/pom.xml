@@ -4,7 +4,7 @@
   <parent>
     <groupId>eu.europeana.metis</groupId>
     <artifactId>metis-common</artifactId>
-    <version>17</version>
+    <version>18</version>
   </parent>
   <artifactId>metis-common-base</artifactId>
 </project>
