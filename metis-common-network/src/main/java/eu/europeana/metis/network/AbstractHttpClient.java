@@ -94,7 +94,9 @@ public abstract class AbstractHttpClient<I, R> implements Closeable {
     connectionManager.setDefaultMaxPerRoute(1);
 
     // Set the request config settings
-    final RequestConfig requestConfig = RequestConfig.custom().setMaxRedirects(maxRedirectCount).build();
+    final RequestConfig requestConfig = RequestConfig.custom()
+                                                     .setRedirectsEnabled(true)
+                                                     .setMaxRedirects(maxRedirectCount).build();
     this.requestTimeout = requestTimeout;
 
     // Build the client.
