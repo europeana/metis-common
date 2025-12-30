@@ -84,9 +84,11 @@ public abstract class AbstractHttpClient<I, R> implements Closeable {
   protected AbstractHttpClient(int maxRedirectCount, int connectTimeout, int responseTimeout,
           int requestTimeout) {
 
-    final ConnectionConfig connectionConfig = ConnectionConfig.custom()
-                                                   .setConnectTimeout(Timeout.ofMilliseconds(connectTimeout))
-                                                   .setSocketTimeout(Timeout.ofMilliseconds(responseTimeout)).build();
+    final ConnectionConfig connectionConfig = ConnectionConfig
+        .custom()
+        .setConnectTimeout(Timeout.ofMilliseconds(connectTimeout))
+        .setSocketTimeout(Timeout.ofMilliseconds(responseTimeout))
+        .build();
 
     // Create a connection manager tuned to one thread use.
     connectionManager = new PoolingHttpClientConnectionManager();
@@ -94,9 +96,12 @@ public abstract class AbstractHttpClient<I, R> implements Closeable {
     connectionManager.setDefaultMaxPerRoute(1);
 
     // Set the request config settings
-    final RequestConfig requestConfig = RequestConfig.custom()
-                                                     .setRedirectsEnabled(true)
-                                                     .setMaxRedirects(maxRedirectCount).build();
+    final RequestConfig requestConfig = RequestConfig
+        .custom()
+        .setRedirectsEnabled(maxRedirectCount > 0)
+        .setMaxRedirects(maxRedirectCount)
+        .build();
+
     this.requestTimeout = requestTimeout;
 
     // Build the client.
