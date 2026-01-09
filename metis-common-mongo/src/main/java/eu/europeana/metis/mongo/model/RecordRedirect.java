@@ -1,19 +1,17 @@
 package eu.europeana.metis.mongo.model;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
-import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import dev.morphia.annotations.Entity;
 import dev.morphia.annotations.Id;
 import dev.morphia.annotations.Indexed;
 import eu.europeana.metis.mongo.utils.ObjectIdSerializer;
-import java.util.Date;
 import org.bson.types.ObjectId;
+import tools.jackson.databind.annotation.JsonSerialize;
+
+import java.util.Date;
 
 /**
  * Record redirect model class.
- *
- * @author Simon Tzanakis (Simon.Tzanakis@europeana.eu)
- * @since 2020-01-13
  */
 @Entity
 public class RecordRedirect implements HasMongoObjectId {

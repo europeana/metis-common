@@ -151,8 +151,8 @@ class ExternalRequestUtilTest {
     assertEquals(expectedMatch, isActualMatch);
   }
 
-  private static Stream<Map> providedMaps() {
-    return Stream.of(new HashMap<String, Integer>(), null);
+  private static Stream<HashMap<String, Integer>> providedMaps() {
+    return Stream.of(new HashMap<>(), null);
   }
 
   @ParameterizedTest

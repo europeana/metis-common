@@ -56,7 +56,6 @@
     <version.jetbrains>24.0.1</version.jetbrains>
     <version.embedded.mongo>4.18.1</version.embedded.mongo>
     <version.mockito.core>4.3.1</version.mockito.core>
-    <version.junit>5.11.4</version.junit>
     <version.log4j>2.23.0</version.log4j>
     <version.slf4j>2.0.12</version.slf4j>
   </properties>
@@ -263,18 +262,6 @@
         <groupId>org.jetbrains</groupId>
         <artifactId>annotations</artifactId>
         <version>${version.jetbrains}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.junit.jupiter</groupId>
-        <artifactId>junit-jupiter-api</artifactId>
-        <version>${version.junit}</version>
-        <scope>test</scope>
-      </dependency>
-      <dependency>
-        <groupId>org.junit.jupiter</groupId>
-        <artifactId>junit-jupiter-engine</artifactId>
-        <scope>test</scope>
-        <version>${version.junit}</version>
       </dependency>
       <dependency>
         <groupId>org.mockito</groupId>

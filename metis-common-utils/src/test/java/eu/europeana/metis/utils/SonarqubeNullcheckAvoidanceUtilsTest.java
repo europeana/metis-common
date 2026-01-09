@@ -39,12 +39,10 @@ class SonarqubeNullcheckAvoidanceUtilsTest {
   void testPerformThrowingAction() {
     Integer number = 15;
 
-    assertThrows(ArithmeticException.class, () -> {
-      performThrowingAction(number, x -> {
-        integerList.add(x + 1);
-        integerList.add(x / 0);
-      });
-    });
+    assertThrows(ArithmeticException.class, () -> performThrowingAction(number, x -> {
+      integerList.add(x + 1);
+      integerList.add(x / 0);
+    }));
     assertEquals(1, integerList.size());
   }
 

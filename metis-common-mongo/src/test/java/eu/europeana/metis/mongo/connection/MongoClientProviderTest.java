@@ -84,7 +84,7 @@ class MongoClientProviderTest {
 
   @Test
   void getAuthenticationDatabase() {
-    MongoClientProvider<IllegalArgumentException> mongoClientProvider = new MongoClientProvider<IllegalArgumentException>(getMongoProperties());
+    MongoClientProvider<IllegalArgumentException> mongoClientProvider = new MongoClientProvider<>(getMongoProperties());
 
     assertNotNull(mongoClientProvider);
     assertEquals("authenticationDB", mongoClientProvider.getAuthenticationDatabase());
@@ -92,7 +92,7 @@ class MongoClientProviderTest {
 
   @Test
   void createMongoClient() {
-    final MongoClient mongoClient = new MongoClientProvider<IllegalArgumentException>(getMongoProperties()).createMongoClient();
+    final MongoClient mongoClient = new MongoClientProvider<>(getMongoProperties()).createMongoClient();
 
     assertNotNull(mongoClient);
     assertInstanceOf(MongoClient.class, mongoClient);

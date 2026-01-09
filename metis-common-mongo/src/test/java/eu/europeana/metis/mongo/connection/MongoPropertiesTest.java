@@ -17,7 +17,7 @@ import org.junit.jupiter.api.Test;
  */
 class MongoPropertiesTest {
 
-  private MongoProperties mongoProperties;
+  private MongoProperties<IllegalArgumentException> mongoProperties;
 
   @Test
   void setAllProperties() throws Exception {
