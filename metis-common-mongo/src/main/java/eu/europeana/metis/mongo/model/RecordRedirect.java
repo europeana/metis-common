@@ -5,10 +5,9 @@ import dev.morphia.annotations.Entity;
 import dev.morphia.annotations.Id;
 import dev.morphia.annotations.Indexed;
 import eu.europeana.metis.mongo.utils.ObjectIdSerializer;
+import java.util.Date;
 import org.bson.types.ObjectId;
 import tools.jackson.databind.annotation.JsonSerialize;
-
-import java.util.Date;
 
 /**
  * Record redirect model class.

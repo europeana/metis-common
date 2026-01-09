@@ -33,7 +33,8 @@ class ObjectIdSerializerTest {
     final String expectedObjectId = "\"507f1f77bcf86cd799439011\"";
     final ObjectId objectId = new ObjectId("507f1f77bcf86cd799439011");
     final Writer jsonWriter = new StringWriter();
-    final JsonGenerator jsonGenerator = getJsonGenerator(jsonWriter);
+    final ObjectMapper mapper = new ObjectMapper();
+    final JsonGenerator jsonGenerator = getJsonGenerator(mapper, jsonWriter);
 
     objectIdSerializer.serialize(objectId, jsonGenerator, getSerializerProvider());
     jsonGenerator.flush();
@@ -45,7 +46,8 @@ class ObjectIdSerializerTest {
   void serializeNull_expectSuccess() {
     final String expectedObjectId = "null";
     final Writer jsonWriter = new StringWriter();
-    final JsonGenerator jsonGenerator = getJsonGenerator(jsonWriter);
+    final ObjectMapper mapper = new ObjectMapper();
+    final JsonGenerator jsonGenerator = getJsonGenerator(mapper, jsonWriter);
 
     objectIdSerializer.serialize(null, jsonGenerator, getSerializerProvider());
     jsonGenerator.flush();
@@ -53,8 +55,10 @@ class ObjectIdSerializerTest {
     assertEquals(expectedObjectId, jsonWriter.toString());
   }
 
-  private static JsonGenerator getJsonGenerator(Writer writer) {
-    return JsonFactory.builder().build().createGenerator(writer);
+  private static JsonGenerator getJsonGenerator(ObjectMapper mapper, Writer writer) {
+    return JsonFactory.builder()
+            .build()
+            .createGenerator(mapper._serializationContext(), writer);
   }
 
   private static SerializationContextExt getSerializerProvider() {

@@ -78,7 +78,7 @@ class MongoPropertiesTest {
   }
 
   @Test
-  void addMongoHost() throws Exception {
+  void addMongoHost() {
     mongoProperties = new MongoProperties<>(IllegalArgumentException::new);
 
     mongoProperties.setAllProperties(new String[]{"localhost"},
@@ -93,7 +93,7 @@ class MongoPropertiesTest {
     assertEquals("192.168.1.2:12345", mongoProperties.getMongoHosts().get(1).toString());
   }
 
-  private static void assertMongoPropertiesOnlyWithAuthentication(MongoProperties mongoProperties) throws Exception {
+  private static void assertMongoPropertiesOnlyWithAuthentication(MongoProperties<IllegalArgumentException> mongoProperties) {
     assertEquals("localhost:8521", mongoProperties.getMongoHosts().getFirst().toString());
     assertNotNull(mongoProperties.getMongoCredentials());
     assertEquals("authenticationdb", mongoProperties.getMongoCredentials().getSource());
@@ -101,12 +101,12 @@ class MongoPropertiesTest {
     assertEquals("password", new String(mongoProperties.getMongoCredentials().getPassword()));
   }
 
-  private static void assertMongoPropertiesWithoutAuthentication(MongoProperties mongoProperties) throws Exception {
+  private static void assertMongoPropertiesWithoutAuthentication(MongoProperties<IllegalArgumentException> mongoProperties) {
     assertEquals("localhost:8521", mongoProperties.getMongoHosts().getFirst().toString());
     assertNull(mongoProperties.getMongoCredentials());
   }
 
-  private static void assertMongoProperties(MongoProperties mongoProperties) throws Exception {
+  private static void assertMongoProperties(MongoProperties<IllegalArgumentException> mongoProperties) {
     assertMongoPropertiesOnlyWithAuthentication(mongoProperties);
     assertTrue(mongoProperties.mongoEnableSsl());
     assertEquals(ReadPreferenceValue.PRIMARY_PREFERRED, mongoProperties.getReadPreferenceValue());

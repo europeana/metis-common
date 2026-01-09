@@ -1,7 +1,5 @@
 package eu.europeana.metis.network;
 
-import static eu.europeana.metis.utils.SonarqubeNullcheckAvoidanceUtils.performThrowingFunction;
-
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
@@ -155,7 +153,6 @@ public abstract class AbstractHttpClient<I, R> implements Closeable {
     try {
       httpGet = new HttpGet(resourceUrl);
     } catch (IllegalArgumentException e) {
-      LOGGER.debug("Malformed URL", e);
       throw new MalformedURLException(e.getMessage());
     }
     requestHeaders.forEach(httpGet::setHeader);
@@ -184,14 +181,12 @@ public abstract class AbstractHttpClient<I, R> implements Closeable {
       closeables.add(responseObject);
 
       // Do first analysis
-      final HttpEntity responseEntity = performThrowingFunction(responseObject, response -> {
-        final int status = response.getCode();
-        if (!httpCallIsSuccessful(status)) {
-          throw new IOException("Download failed of resource " + resourceUrl + ". Status code " +
-              status + " (message: " + response.getReasonPhrase() + ").");
-        }
-        return response.getEntity();
-      });
+      final int status = responseObject.getCode();
+      if (!httpCallIsSuccessful(status)) {
+        throw new IOException("Download failed of resource " + resourceUrl + ". Status code " +
+            status + " (message: " + responseObject.getReasonPhrase() + ").");
+      }
+      final HttpEntity responseEntity =  responseObject.getEntity();
       closeables.add(responseEntity);
 
       // Obtain header information.
