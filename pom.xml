@@ -47,7 +47,6 @@
     <version.elastic.apm>1.48.1</version.elastic.apm>
     <version.commons-compress>1.26.0</version.commons-compress>
     <version.morphia.core>2.5.1</version.morphia.core>
-    <version.jackson>2.16.1</version.jackson>
     <version.solr.solrj>8.8.2</version.solr.solrj>
     <version.jersey>3.1.5</version.jersey>
     <version.commons.io>2.14.0</version.commons.io>
@@ -55,7 +54,6 @@
     <version.commons.collections4>4.4</version.commons.collections4>
     <version.jetbrains>24.0.1</version.jetbrains>
     <version.embedded.mongo>4.18.1</version.embedded.mongo>
-    <version.mockito.core>4.3.1</version.mockito.core>
     <version.log4j>2.23.0</version.log4j>
     <version.slf4j>2.0.12</version.slf4j>
   </properties>
@@ -262,12 +260,6 @@
         <groupId>org.jetbrains</groupId>
         <artifactId>annotations</artifactId>
         <version>${version.jetbrains}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.mockito</groupId>
-        <artifactId>mockito-core</artifactId>
-        <version>${version.mockito.core}</version>
-        <scope>test</scope>
       </dependency>
     </dependencies>
   </dependencyManagement>
