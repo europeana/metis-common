@@ -1,24 +1,5 @@
 package eu.europeana.metis.network;
 
-import static eu.europeana.metis.utils.SonarqubeNullcheckAvoidanceUtils.performThrowingFunction;
-
-import java.io.Closeable;
-import java.io.IOException;
-import java.io.InputStream;
-import java.lang.invoke.MethodHandles;
-import java.net.MalformedURLException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Timer;
-import java.util.TimerTask;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.client5.http.config.ConnectionConfig;
 import org.apache.hc.client5.http.config.RequestConfig;
@@ -36,6 +17,19 @@ import org.apache.hc.core5.util.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ContentDisposition;
+
+import java.io.Closeable;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.invoke.MethodHandles;
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 /**
  * <p>
@@ -155,8 +149,9 @@ public abstract class AbstractHttpClient<I, R> implements Closeable {
     try {
       httpGet = new HttpGet(resourceUrl);
     } catch (IllegalArgumentException e) {
-      LOGGER.debug("Malformed URL", e);
-      throw new MalformedURLException(e.getMessage());
+      MalformedURLException ex = new MalformedURLException("Invalid URL: " + resourceUrl);
+      ex.initCause(e);
+      throw ex;
     }
     requestHeaders.forEach(httpGet::setHeader);
     final HttpClientContext context = HttpClientContext.create();
@@ -184,14 +179,12 @@ public abstract class AbstractHttpClient<I, R> implements Closeable {
       closeables.add(responseObject);
 
       // Do first analysis
-      final HttpEntity responseEntity = performThrowingFunction(responseObject, response -> {
-        final int status = response.getCode();
-        if (!httpCallIsSuccessful(status)) {
-          throw new IOException("Download failed of resource " + resourceUrl + ". Status code " +
-              status + " (message: " + response.getReasonPhrase() + ").");
-        }
-        return response.getEntity();
-      });
+      final int status = responseObject.getCode();
+      if (!httpCallIsSuccessful(status)) {
+        throw new IOException("Download failed of resource " + resourceUrl + ". Status code " +
+            status + " (message: " + responseObject.getReasonPhrase() + ").");
+      }
+      final HttpEntity responseEntity =  responseObject.getEntity();
       closeables.add(responseEntity);
 
       // Obtain header information.

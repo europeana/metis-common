@@ -1,10 +1,5 @@
 package eu.europeana.metis.mongo.utils;
 
-import static dev.morphia.query.filters.Filters.eq;
-import static dev.morphia.query.filters.Filters.or;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-
-import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 import com.mongodb.client.model.Collation;
@@ -18,12 +13,18 @@ import dev.morphia.query.FindOptions;
 import dev.morphia.query.Query;
 import eu.europeana.metis.mongo.embedded.EmbeddedLocalhostMongo;
 import eu.europeana.metis.mongo.model.HasMongoObjectId;
-import java.util.List;
-import java.util.Objects;
 import org.bson.types.ObjectId;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.annotation.JsonSerialize;
+
+import java.util.List;
+import java.util.Objects;
+
+import static dev.morphia.query.filters.Filters.eq;
+import static dev.morphia.query.filters.Filters.or;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Unit test for {@link MorphiaUtils}

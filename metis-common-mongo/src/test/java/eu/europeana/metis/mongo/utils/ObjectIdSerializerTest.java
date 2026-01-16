@@ -1,17 +1,17 @@
 package eu.europeana.metis.mongo.utils;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-
-import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializerProvider;
-import java.io.IOException;
-import java.io.StringWriter;
-import java.io.Writer;
 import org.bson.types.ObjectId;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import tools.jackson.core.JsonGenerator;
+import tools.jackson.core.json.JsonFactory;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ser.SerializationContextExt;
+
+import java.io.StringWriter;
+import java.io.Writer;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Unit test for class {@link ObjectIdSerializer}
@@ -25,15 +25,16 @@ class ObjectIdSerializerTest {
 
   @BeforeEach
   void setup() {
-    this.objectIdSerializer = new ObjectIdSerializer();
+    this.objectIdSerializer = new ObjectIdSerializer(ObjectId.class);
   }
 
   @Test
-  void serializeValue_expectSuccess() throws IOException {
+  void serializeValue_expectSuccess() {
     final String expectedObjectId = "\"507f1f77bcf86cd799439011\"";
     final ObjectId objectId = new ObjectId("507f1f77bcf86cd799439011");
     final Writer jsonWriter = new StringWriter();
-    final JsonGenerator jsonGenerator = getJsonGenerator(jsonWriter);
+    final ObjectMapper mapper = new ObjectMapper();
+    final JsonGenerator jsonGenerator = getJsonGenerator(mapper, jsonWriter);
 
     objectIdSerializer.serialize(objectId, jsonGenerator, getSerializerProvider());
     jsonGenerator.flush();
@@ -42,10 +43,11 @@ class ObjectIdSerializerTest {
   }
 
   @Test
-  void serializeNull_expectSuccess() throws IOException {
+  void serializeNull_expectSuccess() {
     final String expectedObjectId = "null";
     final Writer jsonWriter = new StringWriter();
-    final JsonGenerator jsonGenerator = getJsonGenerator(jsonWriter);
+    final ObjectMapper mapper = new ObjectMapper();
+    final JsonGenerator jsonGenerator = getJsonGenerator(mapper, jsonWriter);
 
     objectIdSerializer.serialize(null, jsonGenerator, getSerializerProvider());
     jsonGenerator.flush();
@@ -53,11 +55,13 @@ class ObjectIdSerializerTest {
     assertEquals(expectedObjectId, jsonWriter.toString());
   }
 
-  private static JsonGenerator getJsonGenerator(Writer writer) throws IOException {
-    return JsonFactory.builder().build().createGenerator(writer);
+  private static JsonGenerator getJsonGenerator(ObjectMapper mapper, Writer writer) {
+    return JsonFactory.builder()
+            .build()
+            .createGenerator(mapper._serializationContext(), writer);
   }
 
-  private static SerializerProvider getSerializerProvider() {
-    return new ObjectMapper().getSerializerProvider();
+  private static SerializationContextExt getSerializerProvider() {
+    return new ObjectMapper()._serializationContext();
   }
 }
