@@ -49,8 +49,6 @@ import static eu.europeana.metis.utils.RestEndpoints.ORCHESTRATOR_WORKFLOWS_EXEC
 import static eu.europeana.metis.utils.RestEndpoints.ORCHESTRATOR_WORKFLOWS_EXECUTIONS_EXECUTIONID;
 import static eu.europeana.metis.utils.RestEndpoints.ORCHESTRATOR_WORKFLOWS_EXECUTIONS_EXECUTIONID_PLUGINS_DATA_AVAILABILITY;
 import static eu.europeana.metis.utils.RestEndpoints.ORCHESTRATOR_WORKFLOWS_EXECUTIONS_OVERVIEW;
-import static eu.europeana.metis.utils.RestEndpoints.ORCHESTRATOR_WORKFLOWS_SCHEDULE;
-import static eu.europeana.metis.utils.RestEndpoints.ORCHESTRATOR_WORKFLOWS_SCHEDULE_DATASETID;
 import static eu.europeana.metis.utils.RestEndpoints.REPOSITORY_HTTP_ENDPOINT_ZIP;
 import static eu.europeana.metis.utils.RestEndpoints.REPOSITORY_OAI_ENDPOINT;
 import static eu.europeana.metis.utils.RestEndpoints.REPOSITORY_RECORDS;
@@ -109,8 +107,6 @@ class RestEndpointsTest {
 
         Arguments.of(ORCHESTRATOR_WORKFLOWS_DATASETID, List.of("datasetId"), "/orchestrator/workflows/datasetId"),
         Arguments.of(ORCHESTRATOR_WORKFLOWS_DATASETID_EXECUTE, List.of("datasetId"), "/orchestrator/workflows/datasetId/execute"),
-        Arguments.of(ORCHESTRATOR_WORKFLOWS_SCHEDULE, List.of(""), "/orchestrator/workflows/schedule"),
-        Arguments.of(ORCHESTRATOR_WORKFLOWS_SCHEDULE_DATASETID, List.of("datasetId"), "/orchestrator/workflows/schedule/datasetId"),
         Arguments.of(ORCHESTRATOR_WORKFLOWS_EXECUTIONS_EXECUTIONID, List.of("executionId"), "/orchestrator/workflows/executions/executionId"),
         Arguments.of(ORCHESTRATOR_WORKFLOWS_EXECUTIONS_EXECUTIONID_PLUGINS_DATA_AVAILABILITY, List.of("executionId"), "/orchestrator/workflows/executions/executionId/plugins/data-availability"),
         Arguments.of(ORCHESTRATOR_WORKFLOWS_EXECUTIONS_DATASET_DATASETID, List.of("datasetId"), "/orchestrator/workflows/executions/dataset/datasetId"),
