@@ -4,7 +4,6 @@ import static eu.europeana.metis.utils.CommonStringValues.BATCH_OF_DATASETS_RETU
 import static eu.europeana.metis.utils.CommonStringValues.CRLF_PATTERN;
 import static eu.europeana.metis.utils.CommonStringValues.DATE_FORMAT;
 import static eu.europeana.metis.utils.CommonStringValues.DATE_FORMAT_FOR_REQUEST_PARAM;
-import static eu.europeana.metis.utils.CommonStringValues.DATE_FORMAT_FOR_SCHEDULING;
 import static eu.europeana.metis.utils.CommonStringValues.DATE_FORMAT_Z;
 import static eu.europeana.metis.utils.CommonStringValues.EUROPEANA_ID_CREATOR_INITIALIZATION_FAILED;
 import static eu.europeana.metis.utils.CommonStringValues.NEXT_PAGE_CANNOT_BE_NEGATIVE;
@@ -35,7 +34,6 @@ class CommonStringValuesTest {
     assertNotNull(EUROPEANA_ID_CREATOR_INITIALIZATION_FAILED);
     assertNotNull(DATE_FORMAT);
     assertNotNull(DATE_FORMAT_Z);
-    assertNotNull(DATE_FORMAT_FOR_SCHEDULING);
     assertNotNull(DATE_FORMAT_FOR_REQUEST_PARAM);
     assertNotNull(S_DATA_PROVIDERS_S_DATA_SETS_S_TEMPLATE);
     assertNotNull(REPLACEABLE_CRLF_CHARACTERS_REGEX);
