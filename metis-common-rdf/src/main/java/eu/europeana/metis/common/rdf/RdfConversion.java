@@ -15,7 +15,10 @@ import org.apache.jena.riot.RDFDataMgr;
 /**
  * <p>
  * This class converts content from one representation format to another. This functionality is not
- * streamed, and can thus not handle large amounts of data.
+ * streamed, and can thus not handle large amounts of data. Note that input is required to be
+ * valid RDF+XML. Specifically, this means that this functionality will not accept data that has
+ * the non-RDF-compliant provenance attributes <code>edm:wasGeneratedBy</code> and
+ * <code>edm:confidenceLevel</code>.
  * </p>
  * <p>
  * A note on implementation: a streamed solution exists as part of Jena RIOT:
@@ -27,13 +30,14 @@ import org.apache.jena.riot.RDFDataMgr;
  * The problem is that this method does not support XML writing, and specifically not the type of
  * normalization we implement (i.e., the flattening). For this reason, this class implements a more
  * generic but less efficient method that is designed to work with small amounts of data (like
- * records and contextual items).
+ * individual records and contextual items).
  * </p>
  */
 public final class RdfConversion {
 
-  // This domain name is reserved and with the unique ID should never occur in the wild. Also,
-  // this will serve to detect relative URLs starting with / as well (i.e., relative to the domain).
+  // This domain name is reserved and with the unique ID should never occur in the wild. Also, as
+  // there is no path component after the domain name, this will serve to detect relative URLs
+  // starting with / as well (i.e., URLs relative to the domain).
   static final String DEFAULT_BASE_URL = "http://7e894f24-c379-4cd8-9698-902d3f279732.example.com/";
 
   private RdfConversion() {
