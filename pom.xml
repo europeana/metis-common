@@ -13,6 +13,7 @@
     <module>metis-common-network</module>
     <module>metis-common-security</module>
     <module>metis-common-utils</module>
+    <module>metis-common-rdf</module>
     <module>metis-common-solr</module>
     <module>metis-common-spring-properties</module>
   </modules>
@@ -55,6 +56,7 @@
     <version.embedded.mongo>4.18.1</version.embedded.mongo>
     <version.log4j>2.23.0</version.log4j>
     <version.slf4j>2.0.12</version.slf4j>
+    <version.jena>6.0.0</version.jena>
   </properties>
 
   <dependencyManagement>
