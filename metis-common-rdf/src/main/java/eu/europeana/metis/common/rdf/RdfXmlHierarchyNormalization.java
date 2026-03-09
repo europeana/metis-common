@@ -4,10 +4,13 @@ import java.io.StringReader;
 import java.io.StringWriter;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
@@ -20,6 +23,7 @@ import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.events.Attribute;
 import javax.xml.stream.events.Characters;
+import javax.xml.stream.events.Namespace;
 import javax.xml.stream.events.StartElement;
 import javax.xml.stream.events.XMLEvent;
 
@@ -107,7 +111,7 @@ public final class RdfXmlHierarchyNormalization {
     // and the list of elements (that excludes the top-level element). Note: we will add new
     // nested elements to the list upon creation: this creates a breadth-first list (if we were to
     // add it upon completion, we would get a depth-first list instead).
-    final NestedElement topLevelElement = new NestedElement(true);
+    final NestedElement topLevelElement = new NestedElement(true, Collections.emptyMap());
     final Deque<NestedElement> elementStack = new ArrayDeque<>();
     elementStack.add(topLevelElement);
     final List<NestedElement> allNestedElements = new ArrayList<>();
@@ -129,14 +133,15 @@ public final class RdfXmlHierarchyNormalization {
             .map(Attribute::getValue).filter(id -> !id.isBlank()).orElse(null);
         if (elementId != null) {
           elementStack.getLast().setReferenceForExtractedNestedElement(elementId, eventFactory);
-          final NestedElement nestedElement = new NestedElement(false);
+          final NestedElement nestedElement = new NestedElement(false,
+              elementStack.getLast().getCurrentAdditionalNamespaces());
           elementStack.addLast(nestedElement);
           allNestedElements.add(nestedElement);
         }
       }
 
       // Add the element and maintain the counter.
-      elementStack.getLast().addEventAndUpdateDepth(currentEvent);
+      elementStack.getLast().addEventAndUpdateDepth(currentEvent, eventFactory);
 
       // Finalize the nested element if we have just ended its root element. All we need to
       // do is pop it from the stack, then we're back in the parent where we left off, we continue
@@ -157,10 +162,23 @@ public final class RdfXmlHierarchyNormalization {
   }
 
   /**
-   * This represents a node of content in the hierarchy. This is either the top level element (i.e.,
+   * <p>This represents a node of content in the hierarchy. This is either the top level element (i.e.,
    * the document, the <code>rdf:RDF</code> and its immediate children), or it represents a nested
    * element with <code>rdf:about</code> value and its content. This element also purges all
    * spacing/indenting from the content.
+   * </p>
+   * <p>This object represents precisely the units of data that need to be moved around. Thus, an
+   * instance of this class exists for an element in the data if and only if:
+   * <ul>
+   *   <li>The element is the root element, or</li>
+   *   <li>The element has a <code>rdf:about</code> value and is not a direct child of the root
+   *   element.</li>
+   * </ul>
+   * All parts of the data are in precisely one instance of this class (that of their closest
+   * ancestor that meets either of these criteria). Furthermore, all instances of this class
+   * (except the top-level element) represent a section of data to be moved to another position so
+   * that it becomes a direct child of the root element.
+   * </p>
    */
   private static class NestedElement {
 
@@ -170,8 +188,13 @@ public final class RdfXmlHierarchyNormalization {
     // Character events are buffered here until they can all be written.
     private final List<Characters> characterBuffer = new ArrayList<>();
 
-    // The current depth at which we are adding.
-    private int currentDepth = 0;
+    // This keeps track of namespaces added for each level in this element (within the root
+    // element). The current depth will always be equal to the size of this stack.
+    private final Deque<List<Namespace>> namespaceStack = new ArrayDeque<>();
+
+    // List of additional namespaces declared in the parent elements (that need to be declared
+    // specifically if we move this nested element to be a child of the root element).
+    private final Map<String, Namespace> additionalNamespaces;
 
     // Indicates whether this is the top-level element in the data.
     private final boolean isTopLevelElement;
@@ -179,10 +202,22 @@ public final class RdfXmlHierarchyNormalization {
     /**
      * Constructor.
      *
-     * @param isTopLevelElement Whether this is the top-level element.
+     * @param isTopLevelElement    Whether this is the top-level element.
+     * @param additionalNamespaces List of additional namespaces declared in the parent elements
+     *                             (that need to be declared specifically if we move this nested
+     *                             element to be a child of the root element).
      */
-    public NestedElement(boolean isTopLevelElement) {
+    public NestedElement(boolean isTopLevelElement, Map<String, Namespace> additionalNamespaces) {
       this.isTopLevelElement = isTopLevelElement;
+      this.additionalNamespaces = additionalNamespaces;
+    }
+
+    /**
+     * The current depth is always equal to the size of the namespace stack.
+     * @return The current depth.
+     */
+    public int getCurrentDepth() {
+      return namespaceStack.size();
     }
 
     /**
@@ -202,8 +237,9 @@ public final class RdfXmlHierarchyNormalization {
      * based on the event that is received.
      *
      * @param event The event to add.
+     * @param eventFactory The event factory for creating event-related objects.
      */
-    public void addEventAndUpdateDepth(XMLEvent event) {
+    public void addEventAndUpdateDepth(XMLEvent event, XMLEventFactory eventFactory) {
 
       // Add the event. Characters go into the buffer. If we find a non-character event, we
       // decide on whether to add all the characters to the event list, or discard (purge) them.
@@ -224,13 +260,36 @@ public final class RdfXmlHierarchyNormalization {
         events.add(event);
       }
 
-      // Update the depth. Must be after deciding on purging so that the depth still reflects
-      // the depth of the characters for which we are making this decision.
+      // Update the namespace stack (and implicitly the depth). This must be after deciding on
+      // purging characters, so that the depth still reflects the depth of the characters for which
+      // we are making this decision.
       if (event.isStartElement()) {
-        currentDepth++;
+
+        // Add a namespace list to the stack.
+        final List<Namespace> namespaces = new ArrayList<>();
+        this.namespaceStack.addLast(namespaces);
+
+        // We only add namespaces if this new element is not the root element.
+        if (isNotAtRootElement()) {
+          event.asStartElement().getNamespaces().forEachRemaining(namespaces::add);
+        }
       }
       if (event.isEndElement()) {
-        currentDepth--;
+        this.namespaceStack.removeLast();
+      }
+
+      // If this is the first event of this element, then it is this element's root element, and it
+      // needs to be equipped with all the namespaces it inherits from its ancestor. Otherwise,
+      // these will be lost as soon as this element is inserted at the root level. We do this after
+      // the namespace stack is updated for this element, so that we also keep the namespaces that
+      // this element itself declares.
+      if (isNotAtRootElement() && events.size() == 1 && !additionalNamespaces.isEmpty()) {
+        final StartElement startElement = events.getFirst().asStartElement();
+        events.set(0, eventFactory.createStartElement(
+            startElement.getName().getPrefix(), startElement.getName().getNamespaceURI(),
+            startElement.getName().getLocalPart(), startElement.getAttributes(),
+            getCurrentAdditionalNamespaces().values().iterator(),
+            startElement.getNamespaceContext()));
       }
     }
 
@@ -240,7 +299,7 @@ public final class RdfXmlHierarchyNormalization {
      * element, as a <code>rdf:resource</code> reference needs to be added.
      *
      * @param reference    The reference to register.
-     * @param eventFactory The event factory for creating the attribute with the reference.
+     * @param eventFactory The event factory for creating event-related objects.
      */
     public void setReferenceForExtractedNestedElement(String reference, XMLEventFactory eventFactory) {
 
@@ -267,12 +326,29 @@ public final class RdfXmlHierarchyNormalization {
       }
     }
 
-    public int getCurrentDepth() {
-      return currentDepth;
-    }
-
+    /**
+     * Get the list of events making up this nested element.
+     * @return The list of events.
+     */
     public List<XMLEvent> getEvents() {
       return Collections.unmodifiableList(events);
+    }
+
+    /**
+     * Compile the additional namespaces that were added in anything other than the root element.
+     * This is done by taking the additional namespaces that this nested element came with, and
+     * adding (or replacing) any new declarations that were found within this nested element. We
+     * need to ensure that if a new namespace is declared for a prefix, the newest (i.e., the
+     * deepest) declaration wins.
+     *
+     * @return The additional namespaces at the current point in the event list, in a map with the
+     * prefix as key.
+     */
+    public Map<String, Namespace> getCurrentAdditionalNamespaces() {
+      final Map<String, Namespace> result = new HashMap<>(additionalNamespaces);
+      namespaceStack.stream().flatMap(Collection::stream)
+          .forEach(namespace -> result.put(namespace.getPrefix(), namespace));
+      return Collections.unmodifiableMap(result);
     }
   }
 
