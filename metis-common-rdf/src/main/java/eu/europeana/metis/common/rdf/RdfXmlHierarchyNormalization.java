@@ -32,7 +32,7 @@ import javax.xml.stream.events.XMLEvent;
  * directly underneath the root element, which is assumed to be <code>rdf:RDF</code>). Resource
  * references (<code>rdf:resource</code> attributes) are inserted in the former parent element.
  * Blank nodes (nested anonymous elements without a <code>rdf:about</code> value) will be left
- * untouched.
+ * untouched. The result will be made "pretty": indented with an indent of 2 spaces.
  * </p>
  * <p>For example, consider the following XML (omitting the namespace declarations):</p>
  * {@snippet lang = "XML":
@@ -66,8 +66,9 @@ import javax.xml.stream.events.XMLEvent;
  * <p> This implementation of hierarchy normalization is not streamed, as we need to keep
  * significant portions of the content in memory (namely, all nested elements, so that we can add
  * them in later at the right place). This means that this implementation is designed to work with
- * small amounts of data (like individual records and contextual items). However, this
- * implementation does ensure a pretty output, with an indentation of 2 spaces.
+ * small amounts of data (like individual records and contextual items). A logical alternative would
+ * have been to load in Jena and then write some custom export tool. This seems to be more complex
+ * than the approach implemented here (even though it could perhaps have been made more performant).
  * </p>
  * <p> <b>Please note:</b> <i>The input data is assumed to be valid RDF+XML.</i> This means that
  * this functionality does not check RDF+XML compliance, but rather acts 'in good faith'. One
@@ -84,8 +85,9 @@ import javax.xml.stream.events.XMLEvent;
  */
 public final class RdfXmlHierarchyNormalization {
 
-  private RdfXmlHierarchyNormalization() {
-  }
+  private static final String RDF_NAMESPACE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
+  private static final String RDF_ABOUT = "about";
+  private static final String RDF_RESOURCE = "resource";
 
   /**
    * Perform hierarchy normalization on the provided content.
@@ -123,7 +125,7 @@ public final class RdfXmlHierarchyNormalization {
       if (isNotAtRootElementBeforeEvent && currentEvent.isStartElement()) {
         final StartElement element = currentEvent.asStartElement();
         final String elementId = Optional.ofNullable(element.getAttributeByName(
-                new QName("http://www.w3.org/1999/02/22-rdf-syntax-ns#", "about")))
+                new QName(RDF_NAMESPACE, RDF_ABOUT)))
             .map(Attribute::getValue).filter(id -> !id.isBlank()).orElse(null);
         if (elementId != null) {
           elementStack.getLast().setReferenceForExtractedNestedElement(elementId, eventFactory);
@@ -184,6 +186,17 @@ public final class RdfXmlHierarchyNormalization {
     }
 
     /**
+     * We are at the root element (i.e., rdf:RDF) if and only if this is the top level element and,
+     * within this element, we are not deeper than depth 1 (i.e., inside rdf:RDF but not inside any
+     * of its child elements).
+     *
+     * @return True if and only if we are not at the root element.
+     */
+    private boolean isNotAtRootElement() {
+      return !this.isTopLevelElement || getCurrentDepth() > 1;
+    }
+
+    /**
      * Adds an event to this element. This method is used while we are receiving events, and we
      * determine it should be part of this element. We update other properties of this element
      * based on the event that is received.
@@ -200,12 +213,11 @@ public final class RdfXmlHierarchyNormalization {
       if (event.isCharacters()) {
         this.characterBuffer.add(event.asCharacters());
       } else {
-        final boolean isNotAtRootElement = !this.isTopLevelElement || this.currentDepth > 1;
         final boolean isBetweenNonReferenceStartAndEnd = !events.isEmpty() &&
             events.getLast().isStartElement() && event.isEndElement() &&
             events.getLast().asStartElement().getAttributeByName(
-                new QName("http://www.w3.org/1999/02/22-rdf-syntax-ns#", "resource")) == null;
-        if (isBetweenNonReferenceStartAndEnd && isNotAtRootElement) {
+                new QName(RDF_NAMESPACE, RDF_RESOURCE)) == null;
+        if (isBetweenNonReferenceStartAndEnd && isNotAtRootElement()) {
           events.addAll(characterBuffer);
         }
         characterBuffer.clear();
@@ -235,16 +247,16 @@ public final class RdfXmlHierarchyNormalization {
       // The last added non-character element at this point must be a start element. Add the
       // reference only if we are not looking at the content's root element (rdf:RDF) and the
       // element does not already have a reference (which would be against RDF+XML rules).
-      final boolean isNotAtRootElement = !this.isTopLevelElement || this.currentDepth > 1;
       final StartElement currentElement = events.getLast().asStartElement();
       final boolean doesNotContainReference = Optional.ofNullable(currentElement.asStartElement()
-              .getAttributeByName(new QName("http://www.w3.org/1999/02/22-rdf-syntax-ns#", "resource")))
+              .getAttributeByName(new QName(RDF_NAMESPACE, RDF_RESOURCE)))
           .map(Attribute::getValue).filter(value -> !value.isBlank()).isEmpty();
-      if (isNotAtRootElement && doesNotContainReference) {
+      if (isNotAtRootElement() && doesNotContainReference) {
         final Iterable<Attribute> currentAttributes = () -> Optional
             .ofNullable(currentElement.getAttributes()).orElse(Collections.emptyIterator());
+        // TODO be smarter about the prefix: check the namespace declarations in the doc.
         final Attribute newAttribute = eventFactory.createAttribute(
-            new QName("http://www.w3.org/1999/02/22-rdf-syntax-ns#", "resource", "rdf"), reference);
+            new QName(RDF_NAMESPACE, RDF_RESOURCE, "rdf"), reference);
         final Iterator<Attribute> newAttributes = Stream.concat(Stream.of(newAttribute),
             StreamSupport.stream(currentAttributes.spliterator(), false)).iterator();
         final StartElement newElement = eventFactory.createStartElement(
