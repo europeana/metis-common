@@ -64,6 +64,10 @@ import javax.xml.stream.events.XMLEvent;
  *   </Author>
  * </rdf:RDF>
  *}
+ * <p>Note that we have extracted the nested object (<code>Author</code>) from the containing one
+ * (<code>Book</code> and moved it up to the root level. In order to preserve the relation, we
+ * instead added a <code>rdf:resource</code> reference where the nested object was.
+ * </p>
  * <p>The benefit of hierarchy normalization lies in normalizing the otherwise unpredictable
  * structure of XML data. This is useful, for instance, ahead of applying an XSLT: the XSLT can now
  * be made to assume the flattened structure and hence be simpler.
@@ -76,10 +80,11 @@ import javax.xml.stream.events.XMLEvent;
  * than the approach implemented here (even though it could perhaps have been made more performant).
  * </p>
  * <p> <b>Please note:</b> <i>The input data is assumed to be valid RDF+XML.</i> This means that
- * this functionality does not check RDF+XML compliance, but rather acts 'in good faith'. One
- * example: if a property has multiple child resources in the input data (not allowed in RDF+XML),
- * the caller may not be notified. Instead, the property will have a reference to just one of the
- * resources, and the reference to the other one may be lost.
+ * this functionality does not always check RDF+XML compliance, but rather acts 'in good faith'.
+ * In some cases, particularly where changes are made, we do check rudimentary compliance. For
+ * example, if a property has multiple child resources in the input data (not allowed in RDF+XML),
+ * an exception would be thrown as the property cannot have multiple <code>rdf:resource</code>
+ * attributes after hierarchy normalization.
  * </p>
  * <p> <b>Exception to the above:</b> At the time of writing, some provenance information is
  * encoded in a manner that is not compliant with RDF+XML. Specifically, attributes
@@ -108,65 +113,66 @@ public final class RdfXmlHierarchyNormalization {
     final XMLEventReader reader = XMLInputFactory.newInstance()
         .createXMLEventReader(new StringReader(content));
 
-    // Create and bootstrap the nested element (scope) stack (that includes the top-level element)
-    // and the list of elements (that excludes the top-level element). Note: we will add new
-    // nested elements to the list upon creation: this creates a breadth-first list (if we were to
+    // Create and bootstrap the nested section (scope) stack (that includes the top-level section)
+    // and the list of sections (that excludes the top-level section). Note: we will add new
+    // nested sections to the list upon creation: this creates a breadth-first list (if we were to
     // add it upon completion, we would get a depth-first list instead).
-    final NestedElement topLevelElement = new NestedElement(true, Collections.emptyMap());
-    final Deque<NestedElement> elementStack = new ArrayDeque<>();
-    elementStack.add(topLevelElement);
-    final List<NestedElement> allNestedElements = new ArrayList<>();
+    final NestedSection topLevelSection = new NestedSection(true, Collections.emptyMap());
+    final Deque<NestedSection> sectionStack = new ArrayDeque<>();
+    sectionStack.add(topLevelSection);
+    final List<NestedSection> allNestedSections = new ArrayList<>();
 
-    // Read all events and separate them by element, preserving the order within each nested element.
+    // Read all events and separate them by section, preserving the order within each nested section.
     while (reader.hasNext()) {
       final XMLEvent currentEvent = reader.nextEvent();
 
-      // Start writing a new nested element if we find an element with an ID (i.e., rdf:about
+      // Start writing a new nested section if we find an element with an ID (i.e., rdf:about
       // value). We make an exception for the root element (i.e., rdf:RDF) as we should never
-      // create a nested element for it or its children (they are already in the right place).
+      // create a nested section for it or its children (they are already in the right place).
       // We must also add a new reference to the parent element.
-      final boolean isNotAtRootElementBeforeEvent = elementStack.size() > 1 ||
-          elementStack.getLast().getCurrentDepth() > 1;
+      final boolean isNotAtRootElementBeforeEvent = sectionStack.size() > 1 ||
+          sectionStack.getLast().getCurrentDepth() > 1;
       if (isNotAtRootElementBeforeEvent && currentEvent.isStartElement()) {
         final StartElement element = currentEvent.asStartElement();
         final String elementId = Optional.ofNullable(element.getAttributeByName(
                 new QName(RDF_NAMESPACE, RDF_ABOUT)))
             .map(Attribute::getValue).filter(id -> !id.isBlank()).orElse(null);
         if (elementId != null) {
-          elementStack.getLast().setReferenceForExtractedNestedElement(elementId, eventFactory);
-          final NestedElement nestedElement = new NestedElement(false,
-              elementStack.getLast().getCurrentAdditionalNamespaces());
-          elementStack.addLast(nestedElement);
-          allNestedElements.add(nestedElement);
+          sectionStack.getLast().setReferenceForExtractedNestedSection(elementId, eventFactory);
+          final NestedSection nestedSection = new NestedSection(false,
+              sectionStack.getLast().getCurrentAdditionalNamespaces());
+          sectionStack.addLast(nestedSection);
+          allNestedSections.add(nestedSection);
         }
       }
 
       // Add the element and maintain the counter.
-      elementStack.getLast().addEventAndUpdateDepth(currentEvent, eventFactory);
+      sectionStack.getLast().addEventAndUpdateDepth(currentEvent, eventFactory);
 
       // Finalize the nested element if we have just ended its root element. All we need to
       // do is pop it from the stack, then we're back in the parent where we left off, we continue
-      // writing there. Of course, we only do this if we are not already in the top-level element.
-      if (currentEvent.isEndElement() && elementStack.getLast().getCurrentDepth() == 0
-          && elementStack.size() > 1) {
-        elementStack.removeLast();
+      // writing there. Of course, we only do this if we are not already in the top-level section.
+      if (currentEvent.isEndElement() && sectionStack.getLast().getCurrentDepth() == 0
+          && sectionStack.size() > 1) {
+        sectionStack.removeLast();
       }
     }
 
     // Set up the output for the normalized XML data.
     final StringWriter flattenedWriter = new StringWriter();
     final XMLEventWriter writer = XMLOutputFactory.newInstance().createXMLEventWriter(flattenedWriter);
-    new PrettyPrintingWriterWrapper(writer, eventFactory).write(topLevelElement, allNestedElements);
+    new PrettyPrintingWriterWrapper(writer, eventFactory).write(topLevelSection, allNestedSections);
 
     // Done
     return flattenedWriter.toString();
   }
 
   /**
-   * <p>This represents a node of content in the hierarchy. This is either the top level element (i.e.,
-   * the document, the <code>rdf:RDF</code> and its immediate children), or it represents a nested
-   * element with <code>rdf:about</code> value and its content. This element also purges all
-   * spacing/indenting from the content.
+   * <p>This represents a section of content in the hierarchy. This is either the top level section
+   * (i.e., the document, the <code>rdf:RDF</code> and its immediate children), or it represents a
+   * nested section defined by an element with <code>rdf:about</code> value and all its content.
+   * </p>
+   * <p>As content is added to this section, all spacing/indenting is purged from the content.
    * </p>
    * <p>This object represents precisely the units of data that need to be moved around. Thus, an
    * instance of this class exists for an element in the data if and only if:
@@ -177,14 +183,14 @@ public final class RdfXmlHierarchyNormalization {
    * </ul>
    * All parts of the data are in precisely one instance of this class (that of their closest
    * ancestor that meets either of these criteria). Furthermore, all instances of this class
-   * (except the top-level element) represent a section of data to be moved to another position so
+   * (except the top-level section) represent a section of data to be moved to another position so
    * that it becomes a direct child of the root element.
    * </p>
    */
-  private static class NestedElement {
+  private static class NestedSection {
 
     /**
-     * The events in this element. the last event in this list is always a non-character event.
+     * The events in this section. the last event in this list is always a non-character event.
      */
     private final List<XMLEvent> events = new ArrayList<>();
 
@@ -195,35 +201,35 @@ public final class RdfXmlHierarchyNormalization {
     private final List<Characters> characterBuffer = new ArrayList<>();
 
     /**
-     * This keeps track of namespaces added for each level in this element (except the root
+     * List of inherited namespaces (declared in all parent elements of this section). These
+     * namespaces will all need to be declared specifically if we move this nested section to be a
+     * child of the root element. Namespaces that are declared in the root element are therefore
+     * not included.
+     */
+    private final Map<String, Namespace> inheritedNamespaces;
+
+    /**
+     * This keeps track of namespaces added for each level in this section (except the root
      * element). The current depth will always be equal to the size of this stack.
      */
     private final Deque<List<Namespace>> namespaceStack = new ArrayDeque<>();
 
     /**
-     * List of additional namespaces declared in all parent elements of this element. These
-     * namespaces will all need to be declared specifically if we move this nested element to be a
-     * child of the root element. Namespaces that are declared in the root element are therefore
-     * not included.
+     * Indicates whether this is the top-level section in the data (containing the root element).
      */
-    private final Map<String, Namespace> additionalNamespaces;
-
-    /**
-     * Indicates whether this is the top-level element in the data (containing the root element).
-     */
-    private final boolean isTopLevelElement;
+    private final boolean isTopLevelSection;
 
     /**
      * Constructor.
      *
-     * @param isTopLevelElement    Whether this is the top-level element.
-     * @param additionalNamespaces List of additional namespaces declared in the parent elements
-     *                             (that need to be declared specifically if we move this nested
-     *                             element to be a child of the root element).
+     * @param isTopLevelSection   Whether this is the top-level section.
+     * @param inheritedNamespaces List of inherited namespaces declared in all parent elements
+     *                            (that need to be declared specifically if we move this nested
+     *                            section to be a child of the root element).
      */
-    public NestedElement(boolean isTopLevelElement, Map<String, Namespace> additionalNamespaces) {
-      this.isTopLevelElement = isTopLevelElement;
-      this.additionalNamespaces = additionalNamespaces;
+    public NestedSection(boolean isTopLevelSection, Map<String, Namespace> inheritedNamespaces) {
+      this.isTopLevelSection = isTopLevelSection;
+      this.inheritedNamespaces = inheritedNamespaces;
     }
 
     /**
@@ -235,19 +241,19 @@ public final class RdfXmlHierarchyNormalization {
     }
 
     /**
-     * We are at the root element (i.e., rdf:RDF) if and only if this is the top level element and,
-     * within this element, we are not deeper than depth 1 (i.e., inside rdf:RDF but not inside any
-     * of its child elements).
+     * We are at the root element (i.e., <code>rdf:RDF</code>) if and only if this is the top level
+     * section and, within this section, we are not deeper than depth 1 (i.e., inside
+     * <code>rdf:RDF</code> but not inside any of its child elements).
      *
      * @return True if and only if we are not at the root element.
      */
     private boolean isNotAtRootElement() {
-      return !this.isTopLevelElement || getCurrentDepth() > 1;
+      return !this.isTopLevelSection || getCurrentDepth() > 1;
     }
 
     /**
-     * Adds an event to this element. This method is used while we are receiving events, and we
-     * determine it should be part of this element. We update other properties of this element
+     * Adds an event to this section. This method is used while we are receiving events, and we
+     * determine it should be part of this section. We update other properties of this section
      * based on the event that is received.
      *
      * @param event The event to add.
@@ -259,7 +265,7 @@ public final class RdfXmlHierarchyNormalization {
       // decide on whether to add all the characters to the event list, or discard (purge) them.
       // We only add the characters if we are between a start and an end, and the start does not
       // have a rdf:resource link. So between start and start, between end and end, and between
-      // end and start, we don't add characters. Also, we always purge at the top level element.
+      // end and start, we don't add characters. Also, we always purge at the top level section.
       if (event.isCharacters()) {
         this.characterBuffer.add(event.asCharacters());
       } else {
@@ -294,12 +300,12 @@ public final class RdfXmlHierarchyNormalization {
         this.namespaceStack.removeLast();
       }
 
-      // If this is the first event of this element, then it is this element's root element, and it
+      // If this is the first event of this section, then it is this section's root element, and it
       // needs to be equipped with all the namespaces it inherits from its ancestor. Otherwise,
-      // these will be lost as soon as this element is inserted at the root level. We do this after
-      // the namespace stack is updated for this element, so that we also keep the namespaces that
+      // these would be lost as soon as this element is inserted at the root level. We do this after
+      // the namespace stack is updated for this element, so that we also get the namespaces that
       // this element itself declares.
-      if (isNotAtRootElement() && events.size() == 1 && !additionalNamespaces.isEmpty()) {
+      if (isNotAtRootElement() && events.size() == 1 && !inheritedNamespaces.isEmpty()) {
         final StartElement startElement = events.getFirst().asStartElement();
         events.set(0, eventFactory.createStartElement(
             startElement.getName().getPrefix(), startElement.getName().getNamespaceURI(),
@@ -311,13 +317,14 @@ public final class RdfXmlHierarchyNormalization {
 
     /**
      * This method is called as we are receiving events, and we determine that we need to start a
-     * new (nested) element. We register the new event (by its <code>rdf:about</code>) with this
-     * element, as a <code>rdf:resource</code> reference needs to be added.
+     * new (nested) section. We register the new section (by its <code>rdf:about</code>) with this
+     * element, as a <code>rdf:resource</code> reference needs to be added to refer to it.
      *
      * @param reference    The reference to register.
      * @param eventFactory The event factory for creating event-related objects.
      */
-    public void setReferenceForExtractedNestedElement(String reference, XMLEventFactory eventFactory) {
+    public void setReferenceForExtractedNestedSection(String reference,
+        XMLEventFactory eventFactory) {
 
       // The last added non-character element at this point must be a start element (i.e., be the
       // parent element), otherwise it is a sibling, which is not allowed. Also, if there already
@@ -379,16 +386,16 @@ public final class RdfXmlHierarchyNormalization {
             StreamSupport.stream(currentAttributes.spliterator(), false)).iterator();
 
         // Apply the changes to the current event.
-        final StartElement newElement = eventFactory.createStartElement(
+        events.set(events.size() - 1, eventFactory.createStartElement(
             currentElement.getName().getPrefix(), currentElement.getName().getNamespaceURI(),
             currentElement.getName().getLocalPart(), newAttributes, newNamespaces,
-            currentElement.getNamespaceContext());
-        events.set(events.size() - 1, newElement);
+            currentElement.getNamespaceContext()));
       }
     }
 
     /**
-     * Get the list of events making up this nested element.
+     * Get the list of events making up this nested section.
+     *
      * @return The list of events.
      */
     public List<XMLEvent> getEvents() {
@@ -397,8 +404,8 @@ public final class RdfXmlHierarchyNormalization {
 
     /**
      * Compile the additional namespaces that were added in anything other than the root element.
-     * This is done by taking the additional namespaces that this nested element came with, and
-     * adding (or replacing) any new declarations that were found within this nested element. We
+     * This is done by taking the inherited namespaces that this nested section came with, and
+     * adding (or replacing) any new declarations that were found within this nested section. We
      * need to ensure that if a new namespace is declared for a prefix, the newest (i.e., the
      * deepest) declaration wins.
      *
@@ -406,7 +413,7 @@ public final class RdfXmlHierarchyNormalization {
      * prefix as key.
      */
     public Map<String, Namespace> getCurrentAdditionalNamespaces() {
-      final Map<String, Namespace> result = new HashMap<>(additionalNamespaces);
+      final Map<String, Namespace> result = new HashMap<>(inheritedNamespaces);
       namespaceStack.stream().flatMap(Collection::stream)
           .forEach(namespace -> result.put(namespace.getPrefix(), namespace));
       return Collections.unmodifiableMap(result);
@@ -471,20 +478,21 @@ public final class RdfXmlHierarchyNormalization {
 
     /**
      * Writes all events to the writer. Imposes the right order: first the top level events, then,
-     * just before closing the root element, we add in all the nested elements.
+     * just before closing the root element, we add in all the nested sections.
      *
-     * @param topLevelElement   The top-level element.
-     * @param allNestedElements The remaining nested elements.
+     * @param topLevelSection   The top-level section.
+     * @param allNestedSections The remaining nested sections.
      * @throws XMLStreamException Unexpected processing errors (typically RDF compliance issues).
      */
-    public void write(NestedElement topLevelElement, List<NestedElement> allNestedElements)
+    public void write(NestedSection topLevelSection, List<NestedSection> allNestedSections)
         throws XMLStreamException {
-      // Write to the output. We write the top level element and its contents and then, just before
-      // closing the root element, we add all nested elements in.
-      for (XMLEvent event : topLevelElement.getEvents()) {
+
+      // Write to the output. We write the top level section and its contents and then, just before
+      // closing the root element, we add all nested sections in.
+      for (XMLEvent event : topLevelSection.getEvents()) {
         if (event.isEndElement() && depthCounter == 1) {
-          for (NestedElement nestedElement : allNestedElements) {
-            for (XMLEvent nestedEvent : nestedElement.getEvents()) {
+          for (NestedSection nestedSection : allNestedSections) {
+            for (XMLEvent nestedEvent : nestedSection.getEvents()) {
               writeEvent(nestedEvent);
             }
           }
