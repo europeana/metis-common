@@ -11,6 +11,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
@@ -182,21 +183,34 @@ public final class RdfXmlHierarchyNormalization {
    */
   private static class NestedElement {
 
-    // The last event in this list is always a non-character event.
+    /**
+     * The events in this element. the last event in this list is always a non-character event.
+     */
     private final List<XMLEvent> events = new ArrayList<>();
 
-    // Character events are buffered here until they can all be written.
+    /**
+     * Character events are buffered here until they can all be written together with the next
+     * non-character event (or purged, depending on the situation).
+     */
     private final List<Characters> characterBuffer = new ArrayList<>();
 
-    // This keeps track of namespaces added for each level in this element (within the root
-    // element). The current depth will always be equal to the size of this stack.
+    /**
+     * This keeps track of namespaces added for each level in this element (except the root
+     * element). The current depth will always be equal to the size of this stack.
+     */
     private final Deque<List<Namespace>> namespaceStack = new ArrayDeque<>();
 
-    // List of additional namespaces declared in the parent elements (that need to be declared
-    // specifically if we move this nested element to be a child of the root element).
+    /**
+     * List of additional namespaces declared in all parent elements of this element. These
+     * namespaces will all need to be declared specifically if we move this nested element to be a
+     * child of the root element. Namespaces that are declared in the root element are therefore
+     * not included.
+     */
     private final Map<String, Namespace> additionalNamespaces;
 
-    // Indicates whether this is the top-level element in the data.
+    /**
+     * Indicates whether this is the top-level element in the data (containing the root element).
+     */
     private final boolean isTopLevelElement;
 
     /**
@@ -269,12 +283,14 @@ public final class RdfXmlHierarchyNormalization {
         final List<Namespace> namespaces = new ArrayList<>();
         this.namespaceStack.addLast(namespaces);
 
-        // We only add namespaces if this new element is not the root element.
+        // We only add the actual namespaces if this new element is not the root element.
         if (isNotAtRootElement()) {
           event.asStartElement().getNamespaces().forEachRemaining(namespaces::add);
         }
       }
       if (event.isEndElement()) {
+
+        // Purge this depth's namespace list from the stack.
         this.namespaceStack.removeLast();
       }
 
@@ -303,24 +319,69 @@ public final class RdfXmlHierarchyNormalization {
      */
     public void setReferenceForExtractedNestedElement(String reference, XMLEventFactory eventFactory) {
 
-      // The last added non-character element at this point must be a start element. Add the
-      // reference only if we are not looking at the content's root element (rdf:RDF) and the
-      // element does not already have a reference (which would be against RDF+XML rules).
+      // The last added non-character element at this point must be a start element (i.e., be the
+      // parent element), otherwise it is a sibling, which is not allowed. Also, if there already
+      // is a reference, it is proof of a virtual sibling.
+      if (!events.getLast().isStartElement() || events.getLast().asStartElement()
+          .getAttributeByName(new QName(RDF_NAMESPACE, RDF_RESOURCE)) != null) {
+        throw new IllegalArgumentException("Could not add reference " + reference
+            + ": RDF property contains more than one object.");
+      }
       final StartElement currentElement = events.getLast().asStartElement();
+
+      //  Add the reference only if we are not looking at the content's root element (rdf:RDF) and
+      //  the element does not already have a reference (which would be against RDF+XML rules).
       final boolean doesNotContainReference = Optional.ofNullable(currentElement.asStartElement()
               .getAttributeByName(new QName(RDF_NAMESPACE, RDF_RESOURCE)))
           .map(Attribute::getValue).filter(value -> !value.isBlank()).isEmpty();
       if (isNotAtRootElement() && doesNotContainReference) {
-        final Iterable<Attribute> currentAttributes = () -> Optional
-            .ofNullable(currentElement.getAttributes()).orElse(Collections.emptyIterator());
-        // TODO be smarter about the prefix: check the namespace declarations in the doc.
+
+        // Find the RDF namespace. First see if the namespace is already declared (which will almost
+        // certainly be the case in the context as the root is rdf:ABOUT). If not, it must have been
+        // unset and then set again in this node's child (where a rdf:about is present). In this
+        // very unlikely edge case, we will create a new namespace to be added to the node.
+        String rdfPrefix = currentElement.getNamespaceContext().getPrefix(RDF_NAMESPACE);
+        if (rdfPrefix == null) {
+          rdfPrefix = getCurrentAdditionalNamespaces().entrySet().stream()
+              .filter(entry -> entry.getValue().getNamespaceURI().equals(RDF_NAMESPACE))
+              .map(Entry::getKey).findAny().orElse(null);
+        }
+        final boolean newNamespaceNeeded = rdfPrefix == null;
+        if (rdfPrefix == null) {
+          final Map<String, Namespace> additionalNamespaces = getCurrentAdditionalNamespaces();
+          for (int i = 0; ; i++) {
+            final String candidatePrefix = "rdf" + i;
+            if (currentElement.getNamespaceContext().getPrefix(candidatePrefix) == null &&
+                !additionalNamespaces.containsKey(candidatePrefix)) {
+              rdfPrefix = candidatePrefix;
+              break;
+            }
+          }
+        }
+
+        // If a new namespace is needed, create it, add it to the list and also to the stack.
+        final Iterator<Namespace> newNamespaces;
+        if (newNamespaceNeeded) {
+          final Namespace newNamespace = eventFactory.createNamespace(rdfPrefix, RDF_NAMESPACE);
+          namespaceStack.getLast().add(newNamespace);
+          final Iterable<Namespace> currentNamespaces = currentElement::getNamespaces;
+          newNamespaces = Stream.concat(Stream.of(newNamespace),
+              StreamSupport.stream(currentNamespaces.spliterator(), false)).iterator();
+        } else {
+          newNamespaces = currentElement.getNamespaces();
+        }
+
+        // Create the new attribute and add it to the list.
+        final Iterable<Attribute> currentAttributes = currentElement::getAttributes;
         final Attribute newAttribute = eventFactory.createAttribute(
-            new QName(RDF_NAMESPACE, RDF_RESOURCE, "rdf"), reference);
+            new QName(RDF_NAMESPACE, RDF_RESOURCE, rdfPrefix), reference);
         final Iterator<Attribute> newAttributes = Stream.concat(Stream.of(newAttribute),
             StreamSupport.stream(currentAttributes.spliterator(), false)).iterator();
+
+        // Apply the changes to the current event.
         final StartElement newElement = eventFactory.createStartElement(
             currentElement.getName().getPrefix(), currentElement.getName().getNamespaceURI(),
-            currentElement.getName().getLocalPart(), newAttributes, currentElement.getNamespaces(),
+            currentElement.getName().getLocalPart(), newAttributes, newNamespaces,
             currentElement.getNamespaceContext());
         events.set(events.size() - 1, newElement);
       }
@@ -357,19 +418,19 @@ public final class RdfXmlHierarchyNormalization {
    */
   private static class PrettyPrintingWriterWrapper {
 
-    // The indent size (number of spaces).
+    /** The indent size (number of spaces). **/
     private static final int INDENT_SIZE = 2;
 
-    // The wrapped writer.
+    /** The wrapped writer. **/
     private final XMLEventWriter writer;
 
-    // The factory for creating (indent) events.
+    /** The factory for creating (indent) events. **/
     private final XMLEventFactory eventFactory;
 
-    // The current depth while writing.
+    /** The current depth while writing. **/
     private int depthCounter = 0;
 
-    // The last event that was a start or an end: is used to determine whether to indent.
+    /** The last event that was a start or an end: is used to determine whether to indent. **/
     private XMLEvent lastStartOrEndEvent = null;
 
     /**
