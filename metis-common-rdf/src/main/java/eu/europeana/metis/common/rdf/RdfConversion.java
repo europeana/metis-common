@@ -2,10 +2,13 @@ package eu.europeana.metis.common.rdf;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
+import javax.xml.stream.XMLStreamException;
 import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.ModelFactory;
 import org.apache.jena.rdf.model.Statement;
@@ -58,8 +61,7 @@ public final class RdfConversion {
   public static String convertRdf(String content, RdfRepresentation from, RdfRepresentation to,
       String baseUrl) {
     final ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-    convertRdf(new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8)), from, to,
-        baseUrl, outputStream);
+    convertRdf(new ByteArrayInputStream(content.getBytes()), from, to, baseUrl, outputStream);
     return outputStream.toString(StandardCharsets.UTF_8);
   }
 
@@ -104,5 +106,61 @@ public final class RdfConversion {
 
     // Write to a String.
     RDFDataMgr.write(result, model, to.getLang());
+  }
+
+  /**
+   * Convert the record to XML and normalize the hierarchy (see
+   * {@link RdfXmlHierarchyNormalization}).
+   *
+   * @param content The content to convert and normalize.
+   * @param from    The representation of the source.
+   * @param baseUrl The base URL for the content. Can be <code>null</code>, in which case an
+   *                exception is thrown if relative URLs are encountered.
+   * @return The content in the XML representation.
+   */
+  public static String convertToXmlAndNormalizeHierarchy(String content, RdfRepresentation from,
+      String baseUrl) {
+    return convertToXmlAndNormalizeHierarchy(new ByteArrayInputStream(content.getBytes()), from,
+        baseUrl);
+  }
+
+  /**
+   * Convert the record to XML and normalize the hierarchy (see
+   * {@link RdfXmlHierarchyNormalization}).
+   *
+   * @param content The content to convert and normalize as an input stream.
+   * @param from    The representation of the source.
+   * @param baseUrl The base URL for the content. Can be <code>null</code>, in which case an
+   *                exception is thrown if relative URLs are encountered.
+   * @return The content in the XML representation.
+  */
+  public static String convertToXmlAndNormalizeHierarchy(InputStream content,
+      RdfRepresentation from, String baseUrl) {
+    ByteArrayOutputStream convertedRecord = new ByteArrayOutputStream();
+    convertRdf(content, from, RdfRepresentation.XML, baseUrl, convertedRecord);
+    try {
+      return RdfXmlHierarchyNormalization
+          .normalizeHierarchy(convertedRecord.toString(Charset.defaultCharset()));
+    } catch (XMLStreamException e) {
+      throw new RuntimeException("Unexpected issue with hierarchy normalization.", e);
+    }
+  }
+
+  /**
+   * Convert the record to XML and normalize the hierarchy (see
+   * {@link RdfXmlHierarchyNormalization}).
+   *
+   * @param content The content to convert and normalize as an input stream.
+   * @param from    The representation of the source.
+   * @param baseUrl The base URL for the content. Can be <code>null</code>, in which case an
+   *                exception is thrown if relative URLs are encountered.
+   * @param result  The stream where the result is to be written. Content will be written in the
+   *                default character encoding.
+   * @throws IOException When something went wrong while writing to the provided output stream.
+   */
+  public static void convertToXmlAndNormalizeHierarchy(InputStream content, RdfRepresentation from,
+      String baseUrl, OutputStream result) throws IOException {
+    final String normalizedRecord = convertToXmlAndNormalizeHierarchy(content, from, baseUrl);
+    result.write(normalizedRecord.getBytes());
   }
 }
