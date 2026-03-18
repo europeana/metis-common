@@ -83,12 +83,13 @@ import javax.xml.stream.events.XMLEvent;
  * this functionality does not always check RDF+XML compliance, but rather acts 'in good faith'.
  * In some cases, particularly where changes are made, we do check rudimentary compliance. For
  * example, if a property has multiple child resources in the input data (not allowed in RDF+XML),
- * an exception would be thrown as the property cannot have multiple <code>rdf:resource</code>
- * attributes after hierarchy normalization.
+ * an exception may be thrown as the property cannot have multiple <code>rdf:resource</code>
+ * attributes after hierarchy normalization. But it is important to note that no guarantee exists
+ * that an exception will be thrown if the record is RDF+XML non-compliant.
  * </p>
- * <p> <b>Exception to the above:</b> At the time of writing, some provenance information is
- * encoded in a manner that is not compliant with RDF+XML. Specifically, attributes
- * <code>edm:wasGeneratedBy</code> and <code>edm:confidenceLevel</code> are accepted on
+ * <p> <b>Exception to the expectation of RDF+XML compliance:</b> At the time of writing, some
+ * provenance information is encoded in a manner that is not compliant with RDF+XML. Specifically,
+ * attributes <code>edm:wasGeneratedBy</code> and <code>edm:confidenceLevel</code> are accepted on
  * properties. As this does not affect the structure of the data, hierarchy normalization as
  * implemented here will accept and preserve these annotations.
  * </p>
@@ -104,9 +105,11 @@ public final class RdfXmlHierarchyNormalization {
    *
    * @param content The content to normalize.
    * @return The normalized content.
-   * @throws XMLStreamException Unexpected processing errors (typically RDF compliance issues).
+   * @throws XMLStreamException     Unexpected processing errors (typically RDF compliance issues).
+   * @throws RdfComplianceException When RDF non-compliance is detected.
    */
-  public static String normalizeHierarchy(String content) throws XMLStreamException {
+  public static String normalizeHierarchy(String content)
+      throws XMLStreamException, RdfComplianceException {
 
     // Set up the input with the XML data as provided.
     final XMLEventFactory eventFactory = XMLEventFactory.newInstance();
@@ -138,7 +141,7 @@ public final class RdfXmlHierarchyNormalization {
                 new QName(RDF_NAMESPACE, RDF_ABOUT)))
             .map(Attribute::getValue).filter(id -> !id.isBlank()).orElse(null);
         if (elementId != null) {
-          sectionStack.getLast().setReferenceForExtractedNestedSection(elementId, eventFactory);
+          sectionStack.getLast().setReferenceForCurrentElement(elementId, eventFactory);
           final NestedSection nestedSection = new NestedSection(false,
               sectionStack.getLast().getCurrentAdditionalNamespaces());
           sectionStack.addLast(nestedSection);
@@ -200,6 +203,11 @@ public final class RdfXmlHierarchyNormalization {
      */
     private final List<Characters> characterBuffer = new ArrayList<>();
 
+    // TODO default namespaces are not supported? They work exactly like regular ones, except that
+    //  their prefix is null (and there can only be one)?
+    // TODO also do namespace cleanup some way (less urgent)? If we extract and move a whole section
+    //  some namespace declarations may no longer be needed. This is not an issue, but it would be
+    //  cleaner if they were to be removed.
     /**
      * List of inherited namespaces (declared in all parent elements of this section). These
      * namespaces will all need to be declared specifically if we move this nested section to be a
@@ -265,7 +273,7 @@ public final class RdfXmlHierarchyNormalization {
       // decide on whether to add all the characters to the event list, or discard (purge) them.
       // We only add the characters if we are between a start and an end, and the start does not
       // have a rdf:resource link. So between start and start, between end and end, and between
-      // end and start, we don't add characters. Also, we always purge at the top level section.
+      // end and start, we don't add characters.
       if (event.isCharacters()) {
         this.characterBuffer.add(event.asCharacters());
       } else {
@@ -273,7 +281,7 @@ public final class RdfXmlHierarchyNormalization {
             events.getLast().isStartElement() && event.isEndElement() &&
             events.getLast().asStartElement().getAttributeByName(
                 new QName(RDF_NAMESPACE, RDF_RESOURCE)) == null;
-        if (isBetweenNonReferenceStartAndEnd && isNotAtRootElement()) {
+        if (isBetweenNonReferenceStartAndEnd) {
           events.addAll(characterBuffer);
         }
         characterBuffer.clear();
@@ -305,7 +313,11 @@ public final class RdfXmlHierarchyNormalization {
       // these would be lost as soon as this element is inserted at the root level. We do this after
       // the namespace stack is updated for this element, so that we also get the namespaces that
       // this element itself declares.
-      if (isNotAtRootElement() && events.size() == 1 && !inheritedNamespaces.isEmpty()) {
+      // Note: in reality there are always inherited namespaces (if we are not in the root element)
+      // because we add the rdf:resource value to the parent element before we create a new section.
+      // So there will always be the rdf namespace. So there is no point optimizing by checking
+      // whether there even are inherited namespaces.
+      if (isNotAtRootElement() && events.size() == 1) {
         final StartElement startElement = events.getFirst().asStartElement();
         events.set(0, eventFactory.createStartElement(
             startElement.getName().getPrefix(), startElement.getName().getNamespaceURI(),
@@ -322,75 +334,80 @@ public final class RdfXmlHierarchyNormalization {
      *
      * @param reference    The reference to register.
      * @param eventFactory The event factory for creating event-related objects.
+     * @throws RdfComplianceException When RDF non-compliance is detected.
      */
-    public void setReferenceForExtractedNestedSection(String reference,
-        XMLEventFactory eventFactory) {
+    public void setReferenceForCurrentElement(String reference,
+        XMLEventFactory eventFactory) throws RdfComplianceException {
 
       // The last added non-character element at this point must be a start element (i.e., be the
       // parent element), otherwise it is a sibling, which is not allowed. Also, if there already
       // is a reference, it is proof of a virtual sibling.
-      if (!events.getLast().isStartElement() || events.getLast().asStartElement()
-          .getAttributeByName(new QName(RDF_NAMESPACE, RDF_RESOURCE)) != null) {
-        throw new IllegalArgumentException("Could not add reference " + reference
+      final boolean isStartElementWithExistingReference = Optional.of(events.getLast())
+          .filter(XMLEvent::isStartElement).map(XMLEvent::asStartElement)
+          .map(element -> element.getAttributeByName(new QName(RDF_NAMESPACE, RDF_RESOURCE)))
+          .isPresent();
+      if (!events.getLast().isStartElement() || isStartElementWithExistingReference) {
+        throw new RdfComplianceException("Could not add reference " + reference
             + ": RDF property contains more than one object.");
       }
       final StartElement currentElement = events.getLast().asStartElement();
 
-      //  Add the reference only if we are not looking at the content's root element (rdf:RDF) and
-      //  the element does not already have a reference (which would be against RDF+XML rules).
-      final boolean doesNotContainReference = Optional.ofNullable(currentElement.asStartElement()
-              .getAttributeByName(new QName(RDF_NAMESPACE, RDF_RESOURCE)))
-          .map(Attribute::getValue).filter(value -> !value.isBlank()).isEmpty();
-      if (isNotAtRootElement() && doesNotContainReference) {
+      // Find the RDF namespace. First see if the namespace is already declared (which will almost
+      // certainly be the case in the context as the root is rdf:ABOUT).
+      // Note: it is possible for a namespace to be declared in the additional namespaces but not in
+      // the namespace context. This is because it may have been added earlier during processing
+      // (i.e., in a parent element when a parent section was extracted).
+      String rdfPrefix = currentElement.getNamespaceContext().getPrefix(RDF_NAMESPACE);
+      if (rdfPrefix == null) {
+        rdfPrefix = getCurrentAdditionalNamespaces().entrySet().stream()
+            .filter(entry -> entry.getValue().getNamespaceURI().equals(RDF_NAMESPACE))
+            .map(Entry::getKey).findAny().orElse(null);
+      }
 
-        // Find the RDF namespace. First see if the namespace is already declared (which will almost
-        // certainly be the case in the context as the root is rdf:ABOUT). If not, it must have been
-        // unset and then set again in this node's child (where a rdf:about is present). In this
-        // very unlikely edge case, we will create a new namespace to be added to the node.
-        String rdfPrefix = currentElement.getNamespaceContext().getPrefix(RDF_NAMESPACE);
-        if (rdfPrefix == null) {
-          rdfPrefix = getCurrentAdditionalNamespaces().entrySet().stream()
-              .filter(entry -> entry.getValue().getNamespaceURI().equals(RDF_NAMESPACE))
-              .map(Entry::getKey).findAny().orElse(null);
-        }
-        final boolean newNamespaceNeeded = rdfPrefix == null;
-        if (rdfPrefix == null) {
-          final Map<String, Namespace> additionalNamespaces = getCurrentAdditionalNamespaces();
-          for (int i = 0; ; i++) {
-            final String candidatePrefix = "rdf" + i;
-            if (currentElement.getNamespaceContext().getPrefix(candidatePrefix) == null &&
-                !additionalNamespaces.containsKey(candidatePrefix)) {
-              rdfPrefix = candidatePrefix;
-              break;
-            }
+      // If the namespace was not already declared, it must have been unset and then set again in
+      // this node's child (where a rdf:about is present). In this very unlikely edge case, we will
+      // create a new namespace to be added to the node. We need to find a non-existing prefix.
+      // Note: even though it is possible for a prefix to be declared in the additional namespaces
+      // but not in the namespace context (it may have been added earlier during processing), this
+      // will only happen for this namespace, and would therefore have been detected above. But we
+      // check just to be sure.
+      final boolean newNamespaceNeeded = rdfPrefix == null;
+      if (rdfPrefix == null) {
+        final Map<String, Namespace> additionalNamespaces = getCurrentAdditionalNamespaces();
+        for (int i = 0; ; i++) {
+          final String candidatePrefix = "rdf" + i;
+          if (currentElement.getNamespaceContext().getNamespaceURI(candidatePrefix) == null &&
+              !additionalNamespaces.containsKey(candidatePrefix)) {
+            rdfPrefix = candidatePrefix;
+            break;
           }
         }
-
-        // If a new namespace is needed, create it, add it to the list and also to the stack.
-        final Iterator<Namespace> newNamespaces;
-        if (newNamespaceNeeded) {
-          final Namespace newNamespace = eventFactory.createNamespace(rdfPrefix, RDF_NAMESPACE);
-          namespaceStack.getLast().add(newNamespace);
-          final Iterable<Namespace> currentNamespaces = currentElement::getNamespaces;
-          newNamespaces = Stream.concat(Stream.of(newNamespace),
-              StreamSupport.stream(currentNamespaces.spliterator(), false)).iterator();
-        } else {
-          newNamespaces = currentElement.getNamespaces();
-        }
-
-        // Create the new attribute and add it to the list.
-        final Iterable<Attribute> currentAttributes = currentElement::getAttributes;
-        final Attribute newAttribute = eventFactory.createAttribute(
-            new QName(RDF_NAMESPACE, RDF_RESOURCE, rdfPrefix), reference);
-        final Iterator<Attribute> newAttributes = Stream.concat(Stream.of(newAttribute),
-            StreamSupport.stream(currentAttributes.spliterator(), false)).iterator();
-
-        // Apply the changes to the current event.
-        events.set(events.size() - 1, eventFactory.createStartElement(
-            currentElement.getName().getPrefix(), currentElement.getName().getNamespaceURI(),
-            currentElement.getName().getLocalPart(), newAttributes, newNamespaces,
-            currentElement.getNamespaceContext()));
       }
+
+      // If a new namespace is needed, create it, add it to the element and also to the stack.
+      final Iterator<Namespace> newNamespaces;
+      if (newNamespaceNeeded) {
+        final Namespace newNamespace = eventFactory.createNamespace(rdfPrefix, RDF_NAMESPACE);
+        namespaceStack.getLast().add(newNamespace);
+        final Iterable<Namespace> currentNamespaces = currentElement::getNamespaces;
+        newNamespaces = Stream.concat(Stream.of(newNamespace),
+            StreamSupport.stream(currentNamespaces.spliterator(), false)).iterator();
+      } else {
+        newNamespaces = currentElement.getNamespaces();
+      }
+
+      // Create the new attribute and add it to the list.
+      final Iterable<Attribute> currentAttributes = currentElement::getAttributes;
+      final Attribute newAttribute = eventFactory.createAttribute(
+          new QName(RDF_NAMESPACE, RDF_RESOURCE, rdfPrefix), reference);
+      final Iterator<Attribute> newAttributes = Stream.concat(Stream.of(newAttribute),
+          StreamSupport.stream(currentAttributes.spliterator(), false)).iterator();
+
+      // Apply the changes to the current event.
+      events.set(events.size() - 1, eventFactory.createStartElement(
+          currentElement.getName().getPrefix(), currentElement.getName().getNamespaceURI(),
+          currentElement.getName().getLocalPart(), newAttributes, newNamespaces,
+          currentElement.getNamespaceContext()));
     }
 
     /**

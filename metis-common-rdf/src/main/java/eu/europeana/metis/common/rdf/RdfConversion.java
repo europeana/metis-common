@@ -141,7 +141,7 @@ public final class RdfConversion {
     try {
       return RdfXmlHierarchyNormalization
           .normalizeHierarchy(convertedRecord.toString(Charset.defaultCharset()));
-    } catch (XMLStreamException e) {
+    } catch (XMLStreamException | RdfComplianceException e) {
       throw new RuntimeException("Unexpected issue with hierarchy normalization.", e);
     }
   }
