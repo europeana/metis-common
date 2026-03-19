@@ -7,12 +7,12 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.Charset;
 import java.util.Optional;
-import javax.xml.stream.XMLStreamException;
 import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.ModelFactory;
 import org.apache.jena.rdf.model.Statement;
 import org.apache.jena.rdf.model.StmtIterator;
 import org.apache.jena.riot.RDFDataMgr;
+import org.apache.jena.riot.RiotException;
 
 /**
  * <p>
@@ -56,9 +56,10 @@ public final class RdfConversion {
    * @param baseUrl The base URL for the content. Can be <code>null</code>, in which case an
    *                exception is thrown if relative URLs are encountered.
    * @return The content in the new representation.
+   * @throws ComplianceException When input was found to be noncompliant.
    */
   public static String convertRdf(String content, RdfRepresentation from, RdfRepresentation to,
-      String baseUrl) {
+      String baseUrl) throws ComplianceException {
     final ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
     convertRdf(new ByteArrayInputStream(content.getBytes()), from, to, baseUrl, outputStream);
     return outputStream.toString();
@@ -66,8 +67,8 @@ public final class RdfConversion {
 
   /**
    * Convert RDF content from one representation to another. Note that this conversion is performed
-   * even if the two representations are identical. A call to this method can then serve to
-   * verify the content and achieve more consistency (a kind of 'normalization').
+   * even if the two representations are identical. A call to this method can then serve to verify
+   * the content and achieve more consistency (a kind of 'normalization').
    *
    * @param content The content as an input stream.
    * @param from    The representation of the source.
@@ -75,36 +76,53 @@ public final class RdfConversion {
    * @param baseUrl The base URL for the content. Can be <code>null</code>, in which case an
    *                exception is thrown if relative URLs are encountered.
    * @param result  The stream where the result is to be written.
+   * @throws ComplianceException When input was found to be noncompliant.
    */
   public static void convertRdf(InputStream content, RdfRepresentation from, RdfRepresentation to,
-      String baseUrl, OutputStream result) {
+      String baseUrl, OutputStream result) throws ComplianceException {
 
     // Read the data to a model.
     final String nonNullBaseUrl = Optional.ofNullable(baseUrl)
         .filter(value -> !value.isBlank()).orElse(DEFAULT_BASE_URL);
     final Model model = ModelFactory.createDefaultModel();
-    RDFDataMgr.read(model, content, nonNullBaseUrl, from.getLang());
+    try {
+      RDFDataMgr.read(model, content, nonNullBaseUrl, from.getLang());
+    } catch (RiotException e) {
+      throw new ComplianceException("Input was found to be noncompliant. " + e.getMessage(), e);
+    }
 
     // Check if there were relative URLs without a provided base URL.
-    if (DEFAULT_BASE_URL.equals(nonNullBaseUrl)) {
-      final StmtIterator statements = model.listStatements();
-      try {
-        for (Statement statement : (Iterable<? extends Statement>) () -> statements) {
-          if (statement.getSubject().toString().startsWith(DEFAULT_BASE_URL) ||
-              statement.getPredicate().toString().startsWith(DEFAULT_BASE_URL) ||
-              (statement.getObject().isResource() &&
-                  statement.getObject().asResource().toString().startsWith(DEFAULT_BASE_URL))) {
-            throw new IllegalArgumentException(
-                "This data has relative URLs and a base URL should be provided to convert it.");
-          }
-        }
-      } finally {
-        statements.close();
-      }
+    if (DEFAULT_BASE_URL.equals(nonNullBaseUrl) && containsDefaultBaseUrl(model)) {
+      throw new IllegalArgumentException(
+          "This data has relative URLs and a base URL should be provided to convert it.");
     }
 
     // Write to a String.
     RDFDataMgr.write(result, model, to.getLang());
+  }
+
+  /**
+   * Detects whether the default base url is used as a namespace anywhere in the model. This can be
+   * used to check
+   *
+   * @param model The model to check.
+   * @return Whether the default base url is used.
+   */
+  private static boolean containsDefaultBaseUrl(Model model) {
+    final StmtIterator statements = model.listStatements();
+    try {
+      for (Statement statement : (Iterable<? extends Statement>) () -> statements) {
+        if (statement.getSubject().toString().startsWith(DEFAULT_BASE_URL) ||
+            statement.getPredicate().toString().startsWith(DEFAULT_BASE_URL) ||
+            (statement.getObject().isResource() &&
+                statement.getObject().asResource().toString().startsWith(DEFAULT_BASE_URL))) {
+          return true;
+        }
+      }
+    } finally {
+      statements.close();
+    }
+    return false;
   }
 
   /**
@@ -116,9 +134,10 @@ public final class RdfConversion {
    * @param baseUrl The base URL for the content. Can be <code>null</code>, in which case an
    *                exception is thrown if relative URLs are encountered.
    * @return The content in the XML representation.
+   * @throws ComplianceException When input was found to be noncompliant.
    */
   public static String convertToXmlAndNormalizeHierarchy(String content, RdfRepresentation from,
-      String baseUrl) {
+      String baseUrl) throws ComplianceException {
     return convertToXmlAndNormalizeHierarchy(new ByteArrayInputStream(content.getBytes()), from,
         baseUrl);
   }
@@ -132,16 +151,17 @@ public final class RdfConversion {
    * @param baseUrl The base URL for the content. Can be <code>null</code>, in which case an
    *                exception is thrown if relative URLs are encountered.
    * @return The content in the XML representation.
+   * @throws ComplianceException When input was found to be noncompliant.
   */
   public static String convertToXmlAndNormalizeHierarchy(InputStream content,
-      RdfRepresentation from, String baseUrl) {
+      RdfRepresentation from, String baseUrl) throws ComplianceException {
     ByteArrayOutputStream convertedRecord = new ByteArrayOutputStream();
     convertRdf(content, from, RdfRepresentation.XML, baseUrl, convertedRecord);
     try {
       return RdfXmlHierarchyNormalization
           .normalizeHierarchy(convertedRecord.toString(Charset.defaultCharset()));
-    } catch (XMLStreamException | RdfComplianceException e) {
-      throw new RuntimeException("Unexpected issue with hierarchy normalization.", e);
+    } catch (ComplianceException e) {
+      throw new IllegalStateException("Unexpected issue with hierarchy normalization.", e);
     }
   }
 
@@ -155,10 +175,11 @@ public final class RdfConversion {
    *                exception is thrown if relative URLs are encountered.
    * @param result  The stream where the result is to be written. Content will be written in the
    *                default character encoding.
+   * @throws ComplianceException When input was found to be noncompliant.
    * @throws IOException When something went wrong while writing to the provided output stream.
    */
   public static void convertToXmlAndNormalizeHierarchy(InputStream content, RdfRepresentation from,
-      String baseUrl, OutputStream result) throws IOException {
+      String baseUrl, OutputStream result) throws ComplianceException, IOException {
     final String normalizedRecord = convertToXmlAndNormalizeHierarchy(content, from, baseUrl);
     result.write(normalizedRecord.getBytes());
   }

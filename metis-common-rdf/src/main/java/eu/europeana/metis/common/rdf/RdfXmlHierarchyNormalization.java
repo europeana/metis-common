@@ -102,16 +102,17 @@ public final class RdfXmlHierarchyNormalization {
   private static final String RDF_ABOUT = "about";
   private static final String RDF_RESOURCE = "resource";
 
+  private RdfXmlHierarchyNormalization() {
+  }
+
   /**
    * Perform hierarchy normalization on the provided content.
    *
    * @param content The content to normalize.
    * @return The normalized content.
-   * @throws XMLStreamException     Unexpected processing errors (typically RDF compliance issues).
-   * @throws RdfComplianceException When RDF non-compliance is detected.
+   * @throws ComplianceException When non-compliance is detected.
    */
-  public static String normalizeHierarchy(String content)
-      throws XMLStreamException, RdfComplianceException {
+  public static String normalizeHierarchy(String content) throws ComplianceException {
     final ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
     normalizeHierarchy(content, outputStream);
     return outputStream.toString();
@@ -123,10 +124,27 @@ public final class RdfXmlHierarchyNormalization {
    * @param content The content to normalize.
    * @param result  The stream where the result is to be written. Content will be written in the
    *                default character encoding.
-   * @throws XMLStreamException     Unexpected processing errors (typically RDF compliance issues).
-   * @throws RdfComplianceException When RDF non-compliance is detected.
+   * @throws ComplianceException When non-compliance is detected.
    */
   public static void normalizeHierarchy(String content, OutputStream result)
+      throws ComplianceException {
+    try {
+      normalizeHierarchyInternal(content, result);
+    } catch (XMLStreamException e) {
+      throw new XmlComplianceException("XML Noncompliance detected. " + e.getMessage(), e);
+    }
+  }
+
+  /**
+   * Perform hierarchy normalization on the provided content.
+   *
+   * @param content The content to normalize.
+   * @param result  The stream where the result is to be written. Content will be written in the
+   *                default character encoding.
+   * @throws XMLStreamException     When XML non-compliance is detected.
+   * @throws RdfComplianceException When RDF non-compliance is detected.
+   */
+  private static void normalizeHierarchyInternal(String content, OutputStream result)
       throws XMLStreamException, RdfComplianceException {
 
     // Set up the input with the XML data as provided.
@@ -161,7 +179,7 @@ public final class RdfXmlHierarchyNormalization {
                 new QName(RDF_NAMESPACE, RDF_ABOUT)))
             .map(Attribute::getValue).filter(id -> !id.isBlank()).orElse(null);
         if (elementId != null) {
-          sectionStack.getLast().setReferenceForCurrentElement(elementId, eventFactory);
+          setReferenceForCurrentElement(elementId, sectionStack.getLast(), eventFactory);
           final NestedSection nestedSection = new NestedSection(false,
               sectionStack.getLast().getCurrentAdditionalNamespaces());
           sectionStack.addLast(nestedSection);
@@ -169,8 +187,8 @@ public final class RdfXmlHierarchyNormalization {
         }
       }
 
-      // Add the element and maintain the counter.
-      sectionStack.getLast().addEventAndUpdateDepth(currentEvent, eventFactory);
+      // Add the element and maintain the counter and namespace stack.
+      addEventToSection(currentEvent, sectionStack.getLast(), eventFactory);
 
       // Finalize the nested element if we have just ended its root element. All we need to
       // do is pop it from the stack, then we're back in the parent where we left off, we continue
@@ -184,6 +202,164 @@ public final class RdfXmlHierarchyNormalization {
     // Write the output for the normalized XML data.
     final XMLEventWriter writer = XMLOutputFactory.newInstance().createXMLEventWriter(result);
     new PrettyPrintingWriterWrapper(writer, eventFactory).write(topLevelSection, allNestedSections);
+  }
+
+  /**
+   * Adds an event to the section. This method is used while we are receiving events, and we
+   * determine it should be part of this section. We update other properties of this section based
+   * on the event that is received.
+   *
+   * @param event        The event to add.
+   * @param section      The section to add the event to.
+   * @param eventFactory The event factory for creating event-related objects.
+   */
+  private static void addEventToSection(XMLEvent event, NestedSection section,
+      XMLEventFactory eventFactory) {
+
+    // Add the event. Characters go into the buffer. If we find a non-character event, we
+    // decide on whether to add all the characters to the event list, or discard (purge) them.
+    // We only add the characters if we are between a start and an end, and the start does not
+    // have a rdf:resource link. So between start and start, between end and end, and between
+    // end and start, we don't add characters.
+    if (event.isCharacters()) {
+      section.characterBuffer.add(event.asCharacters());
+    } else {
+      final boolean isBetweenNonReferenceStartAndEnd = !section.events.isEmpty() &&
+          section.events.getLast().isStartElement() && event.isEndElement() &&
+          section.events.getLast().asStartElement().getAttributeByName(
+              new QName(RDF_NAMESPACE, RDF_RESOURCE)) == null;
+      if (isBetweenNonReferenceStartAndEnd) {
+        section.events.addAll(section.characterBuffer);
+      }
+      section.characterBuffer.clear();
+      section.events.add(event);
+    }
+
+    // Update the namespace stack (and implicitly the depth). This must be after deciding on
+    // purging characters, so that the depth still reflects the depth of the characters for which
+    // we are making this decision.
+    if (event.isStartElement()) {
+
+      // Add a namespace list to the stack.
+      final List<Namespace> namespaces = new ArrayList<>();
+      section.namespaceStack.addLast(namespaces);
+
+      // We only add the actual namespaces if this new element is not the root element.
+      if (section.isNotAtRootElement()) {
+        event.asStartElement().getNamespaces().forEachRemaining(namespaces::add);
+      }
+    }
+    if (event.isEndElement()) {
+
+      // Purge this depth's namespace list from the stack.
+      section.namespaceStack.removeLast();
+    }
+
+    // If this is the first event of this section, then it is this section's root element, and it
+    // needs to be equipped with all the namespaces it inherits from its ancestor. Otherwise,
+    // these would be lost as soon as this element is inserted at the root level. We do this after
+    // the namespace stack is updated for this element, so that we also get the namespaces that
+    // this element itself declares.
+    // Note: in reality there are always inherited namespaces (if we are not in the root element)
+    // because we add the rdf:resource value to the parent element before we create a new section.
+    // So there will always be the rdf namespace. So there is no point optimizing by checking
+    // whether there even are inherited namespaces.
+    if (section.isNotAtRootElement() && section.events.size() == 1) {
+      final StartElement startElement = section.events.getFirst().asStartElement();
+      section.events.set(0, eventFactory.createStartElement(
+          startElement.getName().getPrefix(), startElement.getName().getNamespaceURI(),
+          startElement.getName().getLocalPart(), startElement.getAttributes(),
+          section.getCurrentAdditionalNamespaces().values().iterator(),
+          startElement.getNamespaceContext()));
+    }
+  }
+
+  /**
+   * This method is called as we are receiving events, and we determine that we need to start a
+   * new (nested) section. We register the new section (by its <code>rdf:about</code>) with this
+   * section: a <code>rdf:resource</code> reference needs to be added to the current element to
+   * refer to it.
+   *
+   * @param reference    The reference to register.
+   * @param section      The section where to set the reference.
+   * @param eventFactory The event factory for creating event-related objects.
+   * @throws RdfComplianceException When RDF non-compliance is detected.
+   */
+  private static void setReferenceForCurrentElement(String reference, NestedSection section,
+      XMLEventFactory eventFactory) throws RdfComplianceException {
+
+    // The last added non-character element at this point must be a start element (i.e., be the
+    // parent element), otherwise it is a sibling, which is not allowed. Also, if there already
+    // is a reference, it is proof of a virtual sibling.
+    final boolean isStartElementWithExistingReference = Optional.of(section.events.getLast())
+        .filter(XMLEvent::isStartElement).map(XMLEvent::asStartElement)
+        .map(element -> element.getAttributeByName(new QName(RDF_NAMESPACE, RDF_RESOURCE)))
+        .isPresent();
+    if (!section.events.getLast().isStartElement() || isStartElementWithExistingReference) {
+      throw new RdfComplianceException("Could not add reference " + reference
+          + ": RDF property contains more than one object.");
+    }
+    final StartElement currentElement = section.events.getLast().asStartElement();
+
+    // Find the RDF namespace. First see if the namespace is already declared (which will almost
+    // certainly be the case in the context as the root is rdf:ABOUT).
+    // Note: it is possible for a namespace to be declared in the additional namespaces but not in
+    // the namespace context. This is because it may have been added earlier during processing
+    // (i.e., in a parent element when a parent section was extracted).
+    // Note that we don't accept default namespaces: attributes don't work with them.
+    String rdfPrefix = currentElement.getNamespaceContext().getPrefix(RDF_NAMESPACE);
+    if (rdfPrefix == null || XMLConstants.DEFAULT_NS_PREFIX.equals(rdfPrefix)) {
+      rdfPrefix = section.getCurrentAdditionalNamespaces().entrySet().stream()
+          .filter(entry -> entry.getValue().getNamespaceURI().equals(RDF_NAMESPACE))
+          .map(Entry::getKey).findAny().orElse(null);
+    }
+
+    // If the namespace was not already declared, it must have been unset and then set again in
+    // this node's child (where a rdf:about is present). In this very unlikely edge case, we will
+    // create a new namespace to be added to the node. We need to find a non-existing prefix.
+    // Note: even though it is possible for a prefix to be declared in the additional namespaces
+    // but not in the namespace context (it may have been added earlier during processing), this
+    // will only happen for this namespace, and would therefore have been detected above. But we
+    // check just to be sure.
+    // Note that we don't accept default namespaces: attributes don't work with them.
+    final boolean newNamespaceNeeded = rdfPrefix == null
+        || XMLConstants.DEFAULT_NS_PREFIX.equals(rdfPrefix);
+    if (newNamespaceNeeded) {
+      final Map<String, Namespace> additionalNamespaces = section.getCurrentAdditionalNamespaces();
+      for (int i = 0; ; i++) {
+        final String candidatePrefix = "rdf" + i;
+        if (currentElement.getNamespaceContext().getNamespaceURI(candidatePrefix) == null &&
+            !additionalNamespaces.containsKey(candidatePrefix)) {
+          rdfPrefix = candidatePrefix;
+          break;
+        }
+      }
+    }
+
+    // If a new namespace is needed, create it, add it to the element and also to the stack.
+    final Iterator<Namespace> newNamespaces;
+    if (newNamespaceNeeded) {
+      final Namespace newNamespace = eventFactory.createNamespace(rdfPrefix, RDF_NAMESPACE);
+      section.namespaceStack.getLast().add(newNamespace);
+      final Iterable<Namespace> currentNamespaces = currentElement::getNamespaces;
+      newNamespaces = Stream.concat(Stream.of(newNamespace),
+          StreamSupport.stream(currentNamespaces.spliterator(), false)).iterator();
+    } else {
+      newNamespaces = currentElement.getNamespaces();
+    }
+
+    // Create the new attribute and add it to the list.
+    final Iterable<Attribute> currentAttributes = currentElement::getAttributes;
+    final Attribute newAttribute = eventFactory.createAttribute(
+        new QName(RDF_NAMESPACE, RDF_RESOURCE, rdfPrefix), reference);
+    final Iterator<Attribute> newAttributes = Stream.concat(Stream.of(newAttribute),
+        StreamSupport.stream(currentAttributes.spliterator(), false)).iterator();
+
+    // Apply the changes to the current event.
+    section.events.set(section.events.size() - 1, eventFactory.createStartElement(
+        currentElement.getName().getPrefix(), currentElement.getName().getNamespaceURI(),
+        currentElement.getName().getLocalPart(), newAttributes, newNamespaces,
+        currentElement.getNamespaceContext()));
   }
 
   /**
@@ -256,7 +432,7 @@ public final class RdfXmlHierarchyNormalization {
      */
     public NestedSection(boolean isTopLevelSection, Map<String, Namespace> inheritedNamespaces) {
       this.isTopLevelSection = isTopLevelSection;
-      this.inheritedNamespaces = inheritedNamespaces;
+      this.inheritedNamespaces = new HashMap<>(inheritedNamespaces);
     }
 
     /**
@@ -276,169 +452,6 @@ public final class RdfXmlHierarchyNormalization {
      */
     private boolean isNotAtRootElement() {
       return !this.isTopLevelSection || getCurrentDepth() > 1;
-    }
-
-    /**
-     * Adds an event to this section. This method is used while we are receiving events, and we
-     * determine it should be part of this section. We update other properties of this section
-     * based on the event that is received.
-     *
-     * @param event The event to add.
-     * @param eventFactory The event factory for creating event-related objects.
-     */
-    public void addEventAndUpdateDepth(XMLEvent event, XMLEventFactory eventFactory) {
-
-      // Add the event. Characters go into the buffer. If we find a non-character event, we
-      // decide on whether to add all the characters to the event list, or discard (purge) them.
-      // We only add the characters if we are between a start and an end, and the start does not
-      // have a rdf:resource link. So between start and start, between end and end, and between
-      // end and start, we don't add characters.
-      if (event.isCharacters()) {
-        this.characterBuffer.add(event.asCharacters());
-      } else {
-        final boolean isBetweenNonReferenceStartAndEnd = !events.isEmpty() &&
-            events.getLast().isStartElement() && event.isEndElement() &&
-            events.getLast().asStartElement().getAttributeByName(
-                new QName(RDF_NAMESPACE, RDF_RESOURCE)) == null;
-        if (isBetweenNonReferenceStartAndEnd) {
-          events.addAll(characterBuffer);
-        }
-        characterBuffer.clear();
-        events.add(event);
-      }
-
-      // Update the namespace stack (and implicitly the depth). This must be after deciding on
-      // purging characters, so that the depth still reflects the depth of the characters for which
-      // we are making this decision.
-      if (event.isStartElement()) {
-
-        // Add a namespace list to the stack.
-        final List<Namespace> namespaces = new ArrayList<>();
-        this.namespaceStack.addLast(namespaces);
-
-        // We only add the actual namespaces if this new element is not the root element.
-        if (isNotAtRootElement()) {
-          event.asStartElement().getNamespaces().forEachRemaining(namespaces::add);
-        }
-      }
-      if (event.isEndElement()) {
-
-        // Purge this depth's namespace list from the stack.
-        this.namespaceStack.removeLast();
-      }
-
-      // If this is the first event of this section, then it is this section's root element, and it
-      // needs to be equipped with all the namespaces it inherits from its ancestor. Otherwise,
-      // these would be lost as soon as this element is inserted at the root level. We do this after
-      // the namespace stack is updated for this element, so that we also get the namespaces that
-      // this element itself declares.
-      // Note: in reality there are always inherited namespaces (if we are not in the root element)
-      // because we add the rdf:resource value to the parent element before we create a new section.
-      // So there will always be the rdf namespace. So there is no point optimizing by checking
-      // whether there even are inherited namespaces.
-      if (isNotAtRootElement() && events.size() == 1) {
-        final StartElement startElement = events.getFirst().asStartElement();
-        events.set(0, eventFactory.createStartElement(
-            startElement.getName().getPrefix(), startElement.getName().getNamespaceURI(),
-            startElement.getName().getLocalPart(), startElement.getAttributes(),
-            getCurrentAdditionalNamespaces().values().iterator(),
-            startElement.getNamespaceContext()));
-      }
-    }
-
-    /**
-     * This method is called as we are receiving events, and we determine that we need to start a
-     * new (nested) section. We register the new section (by its <code>rdf:about</code>) with this
-     * element, as a <code>rdf:resource</code> reference needs to be added to refer to it.
-     *
-     * @param reference    The reference to register.
-     * @param eventFactory The event factory for creating event-related objects.
-     * @throws RdfComplianceException When RDF non-compliance is detected.
-     */
-    public void setReferenceForCurrentElement(String reference,
-        XMLEventFactory eventFactory) throws RdfComplianceException {
-
-      // The last added non-character element at this point must be a start element (i.e., be the
-      // parent element), otherwise it is a sibling, which is not allowed. Also, if there already
-      // is a reference, it is proof of a virtual sibling.
-      final boolean isStartElementWithExistingReference = Optional.of(events.getLast())
-          .filter(XMLEvent::isStartElement).map(XMLEvent::asStartElement)
-          .map(element -> element.getAttributeByName(new QName(RDF_NAMESPACE, RDF_RESOURCE)))
-          .isPresent();
-      if (!events.getLast().isStartElement() || isStartElementWithExistingReference) {
-        throw new RdfComplianceException("Could not add reference " + reference
-            + ": RDF property contains more than one object.");
-      }
-      final StartElement currentElement = events.getLast().asStartElement();
-
-      // Find the RDF namespace. First see if the namespace is already declared (which will almost
-      // certainly be the case in the context as the root is rdf:ABOUT).
-      // Note: it is possible for a namespace to be declared in the additional namespaces but not in
-      // the namespace context. This is because it may have been added earlier during processing
-      // (i.e., in a parent element when a parent section was extracted).
-      // Note that we don't accept default namespaces: attributes don't work with them.
-      String rdfPrefix = currentElement.getNamespaceContext().getPrefix(RDF_NAMESPACE);
-      if (rdfPrefix == null || XMLConstants.DEFAULT_NS_PREFIX.equals(rdfPrefix)) {
-        rdfPrefix = getCurrentAdditionalNamespaces().entrySet().stream()
-            .filter(entry -> entry.getValue().getNamespaceURI().equals(RDF_NAMESPACE))
-            .map(Entry::getKey).findAny().orElse(null);
-      }
-
-      // If the namespace was not already declared, it must have been unset and then set again in
-      // this node's child (where a rdf:about is present). In this very unlikely edge case, we will
-      // create a new namespace to be added to the node. We need to find a non-existing prefix.
-      // Note: even though it is possible for a prefix to be declared in the additional namespaces
-      // but not in the namespace context (it may have been added earlier during processing), this
-      // will only happen for this namespace, and would therefore have been detected above. But we
-      // check just to be sure.
-      // Note that we don't accept default namespaces: attributes don't work with them.
-      final boolean newNamespaceNeeded = rdfPrefix == null
-          || XMLConstants.DEFAULT_NS_PREFIX.equals(rdfPrefix);
-      if (newNamespaceNeeded) {
-        final Map<String, Namespace> additionalNamespaces = getCurrentAdditionalNamespaces();
-        for (int i = 0; ; i++) {
-          final String candidatePrefix = "rdf" + i;
-          if (currentElement.getNamespaceContext().getNamespaceURI(candidatePrefix) == null &&
-              !additionalNamespaces.containsKey(candidatePrefix)) {
-            rdfPrefix = candidatePrefix;
-            break;
-          }
-        }
-      }
-
-      // If a new namespace is needed, create it, add it to the element and also to the stack.
-      final Iterator<Namespace> newNamespaces;
-      if (newNamespaceNeeded) {
-        final Namespace newNamespace = eventFactory.createNamespace(rdfPrefix, RDF_NAMESPACE);
-        namespaceStack.getLast().add(newNamespace);
-        final Iterable<Namespace> currentNamespaces = currentElement::getNamespaces;
-        newNamespaces = Stream.concat(Stream.of(newNamespace),
-            StreamSupport.stream(currentNamespaces.spliterator(), false)).iterator();
-      } else {
-        newNamespaces = currentElement.getNamespaces();
-      }
-
-      // Create the new attribute and add it to the list.
-      final Iterable<Attribute> currentAttributes = currentElement::getAttributes;
-      final Attribute newAttribute = eventFactory.createAttribute(
-          new QName(RDF_NAMESPACE, RDF_RESOURCE, rdfPrefix), reference);
-      final Iterator<Attribute> newAttributes = Stream.concat(Stream.of(newAttribute),
-          StreamSupport.stream(currentAttributes.spliterator(), false)).iterator();
-
-      // Apply the changes to the current event.
-      events.set(events.size() - 1, eventFactory.createStartElement(
-          currentElement.getName().getPrefix(), currentElement.getName().getNamespaceURI(),
-          currentElement.getName().getLocalPart(), newAttributes, newNamespaces,
-          currentElement.getNamespaceContext()));
-    }
-
-    /**
-     * Get the list of events making up this nested section.
-     *
-     * @return The list of events.
-     */
-    public List<XMLEvent> getEvents() {
-      return Collections.unmodifiableList(events);
     }
 
     /**
@@ -491,8 +504,7 @@ public final class RdfXmlHierarchyNormalization {
     }
 
     private String createNewLineAndIndent() {
-      return depthCounter == 0 ? "\n"
-          : String.format("\n%" + (depthCounter * INDENT_SIZE) + "s", "");
+      return "\n" + " ".repeat(depthCounter * INDENT_SIZE);
     }
 
     private void writeEvent(XMLEvent event) throws XMLStreamException {
@@ -528,12 +540,10 @@ public final class RdfXmlHierarchyNormalization {
 
       // Write to the output. We write the top level section and its contents and then, just before
       // closing the root element, we add all nested sections in.
-      for (XMLEvent event : topLevelSection.getEvents()) {
+      for (XMLEvent event : topLevelSection.events) {
         if (event.isEndElement() && depthCounter == 1) {
           for (NestedSection nestedSection : allNestedSections) {
-            for (XMLEvent nestedEvent : nestedSection.getEvents()) {
-              writeEvent(nestedEvent);
-            }
+            write(nestedSection, Collections.emptyList());
           }
         }
         writeEvent(event);

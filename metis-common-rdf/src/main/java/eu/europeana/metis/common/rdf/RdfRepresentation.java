@@ -1,6 +1,7 @@
 package eu.europeana.metis.common.rdf;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import org.apache.jena.riot.Lang;
@@ -35,7 +36,7 @@ public enum RdfRepresentation {
    * @return The media types (mime types) that are equivalent for this representation.
    */
   public Set<String> getMediaTypes() {
-    return mediaTypes;
+    return Collections.unmodifiableSet(mediaTypes);
   }
 
   /**

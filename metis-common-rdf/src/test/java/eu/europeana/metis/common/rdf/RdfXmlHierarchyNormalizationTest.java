@@ -3,12 +3,11 @@ package eu.europeana.metis.common.rdf;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import javax.xml.stream.XMLStreamException;
 import org.junit.jupiter.api.Test;
 
-public class RdfXmlHierarchyNormalizationTest {
+class RdfXmlHierarchyNormalizationTest {
 
-  private static final String goodDataInput = """
+  private static final String GOOD_DATA_INPUT = """
       <n.1:RDF
           xmlns:n.1="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
           xmlns:n.2="http://example.com/2/"
@@ -44,7 +43,7 @@ public class RdfXmlHierarchyNormalizationTest {
         </n.2:Resource>
       </n.1:RDF>""";
 
-  private static final String goodDataOutput = """
+  private static final String GOOD_DATA_OUTPUT = """
       <?xml version="1.0" ?>
       <n.1:RDF xmlns:n.1="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:n.2="http://example.com/2/" xmlns:n.3="http://example.com/3/">
         <n.2:Resource n.1:about="http://example.com/items/5">
@@ -75,11 +74,11 @@ public class RdfXmlHierarchyNormalizationTest {
         </n.2:Resource>
       </n.1:RDF>""";
 
-  private static final String verySimpleDataInputAndOutput = """
+  private static final String VERY_SIMPLE_DATA_INPUT_AND_OUTPUT = """
       <?xml version="1.0"?>
       <n.1:RDF xmlns:n.1="http://www.w3.org/1999/02/22-rdf-syntax-ns#">TEST</n.1:RDF>""";
 
-  private static final String firstPrefixChoicesAlreadyUsedInput = """
+  private static final String FIRST_PREFIX_CHOICES_ALREADY_USED_INPUT = """
       <?xml version="1.0"?>
       <rdf0:Root xmlns:rdf0="http://example.com/rdf0">
         <rdf0:Resource>
@@ -95,7 +94,7 @@ public class RdfXmlHierarchyNormalizationTest {
         </rdf0:Resource>
       </rdf0:Root>""";
 
-  private static final String firstPrefixChoicesAlreadyUsedOutput = """
+  private static final String FIRST_PREFIX_CHOICES_ALREADY_USED_OUTPUT = """
       <?xml version="1.0"?>
       <rdf0:Root xmlns:rdf0="http://example.com/rdf0">
         <rdf0:Resource>
@@ -109,7 +108,7 @@ public class RdfXmlHierarchyNormalizationTest {
         </rdf0:Resource>
       </rdf0:Root>""";
 
-  private static final String propertyWithTwoChildrenInput = """
+  private static final String PROPERTY_WITH_TWO_CHILDREN_INPUT = """
       <?xml version="1.0"?>
       <n.1:RDF xmlns:n.1="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:n.2="http://example.com/2/">
         <n.2:Resource>
@@ -124,7 +123,7 @@ public class RdfXmlHierarchyNormalizationTest {
         </n.1:Resource>
       </n.1:RDF>""";
 
-  private static final String propertyWithConflictingReferenceInput = """
+  private static final String PROPERTY_WITH_CONFLICTING_REFERENCE_INPUT = """
       <?xml version="1.0"?>
       <n.1:RDF xmlns:n.1="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:n.2="http://example.com/2/">
         <n.2:Resource>
@@ -136,7 +135,7 @@ public class RdfXmlHierarchyNormalizationTest {
         </n.1:Resource>
       </n.1:RDF>""";
 
-  private static final String dataWithDefaultNamespacesInput = """
+  private static final String DATA_WITH_DEFAULT_NAMESPACES_INPUT = """
       <RDF
           xmlns="http://example.com/default_A/"
           xmlns:n.2="http://example.com/2/"
@@ -154,7 +153,7 @@ public class RdfXmlHierarchyNormalizationTest {
         </Resource>
       </RDF>""";
 
-  private static final String getDataWithDefaultNamespacesOutput = """
+  private static final String DATA_WITH_DEFAULT_NAMESPACES_OUTPUT = """
       <?xml version="1.0" ?>
       <RDF xmlns="http://example.com/default_A/" xmlns:n.2="http://example.com/2/" xmlns:n.3="http://example.com/3/">
         <Resource>
@@ -169,17 +168,18 @@ public class RdfXmlHierarchyNormalizationTest {
       </RDF>""";
 
   @Test
-  void testData() throws XMLStreamException, RdfComplianceException {
-    assertEquals(goodDataOutput, RdfXmlHierarchyNormalization.normalizeHierarchy(goodDataInput));
-    assertEquals(verySimpleDataInputAndOutput,
-        RdfXmlHierarchyNormalization.normalizeHierarchy(verySimpleDataInputAndOutput));
-    assertEquals(firstPrefixChoicesAlreadyUsedOutput,
-        RdfXmlHierarchyNormalization.normalizeHierarchy(firstPrefixChoicesAlreadyUsedInput));
+  void testData() throws ComplianceException {
+    assertEquals(GOOD_DATA_OUTPUT, RdfXmlHierarchyNormalization.normalizeHierarchy(GOOD_DATA_INPUT));
+    assertEquals(VERY_SIMPLE_DATA_INPUT_AND_OUTPUT,
+        RdfXmlHierarchyNormalization.normalizeHierarchy(VERY_SIMPLE_DATA_INPUT_AND_OUTPUT));
+    assertEquals(FIRST_PREFIX_CHOICES_ALREADY_USED_OUTPUT,
+        RdfXmlHierarchyNormalization.normalizeHierarchy(FIRST_PREFIX_CHOICES_ALREADY_USED_INPUT));
     assertThrows(RdfComplianceException.class,
-        () -> RdfXmlHierarchyNormalization.normalizeHierarchy(propertyWithTwoChildrenInput));
+        () -> RdfXmlHierarchyNormalization.normalizeHierarchy(PROPERTY_WITH_TWO_CHILDREN_INPUT));
     assertThrows(RdfComplianceException.class,
-        () -> RdfXmlHierarchyNormalization.normalizeHierarchy(propertyWithConflictingReferenceInput));
-    assertEquals(getDataWithDefaultNamespacesOutput,
-        RdfXmlHierarchyNormalization.normalizeHierarchy(dataWithDefaultNamespacesInput));
+        () -> RdfXmlHierarchyNormalization.normalizeHierarchy(
+            PROPERTY_WITH_CONFLICTING_REFERENCE_INPUT));
+    assertEquals(DATA_WITH_DEFAULT_NAMESPACES_OUTPUT,
+        RdfXmlHierarchyNormalization.normalizeHierarchy(DATA_WITH_DEFAULT_NAMESPACES_INPUT));
   }
 }
