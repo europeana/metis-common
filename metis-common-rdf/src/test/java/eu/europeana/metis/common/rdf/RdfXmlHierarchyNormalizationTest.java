@@ -18,7 +18,7 @@ public class RdfXmlHierarchyNormalizationTest {
           <n.3:label xml:lang="en">Resource 6 label 2</n.3:label>
         </n.2:Resource>
         <n.2:Resource n.1:about="http://example.com/items/1" xmlns:n.a="http://example.com/A/">
-          <n.2:property2A xmlns:n.b="http://example.com/B/" xmlns:n.1="http://example.com/4/">
+          <n.2:property2A xmlns:n.b="http://example.com/B/" xmlns:n.1="http://example.com/1/">
             <n.2:Resource n.1:about="http://example.com/items/2" xmlns:n.1="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
               <n.a:test>TEST A</n.a:test>
               <n.b:test>TEST B</n.b:test>
@@ -52,7 +52,7 @@ public class RdfXmlHierarchyNormalizationTest {
           <n.3:label xml:lang="en">Resource 6 label 2</n.3:label>
         </n.2:Resource>
         <n.2:Resource xmlns:n.a="http://example.com/A/" n.1:about="http://example.com/items/1">
-          <n.2:property2A xmlns:rdf0="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:n.b="http://example.com/B/" xmlns:n.1="http://example.com/4/" rdf0:resource="http://example.com/items/2"></n.2:property2A>
+          <n.2:property2A xmlns:rdf0="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:n.b="http://example.com/B/" xmlns:n.1="http://example.com/1/" rdf0:resource="http://example.com/items/2"></n.2:property2A>
         </n.2:Resource>
         <n.2:Resource xmlns:n.a="http://example.com/A/" xmlns:n.1="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:rdf0="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:n.b="http://example.com/B/" n.1:about="http://example.com/items/2">
           <n.a:test>TEST A</n.a:test>
@@ -136,6 +136,38 @@ public class RdfXmlHierarchyNormalizationTest {
         </n.1:Resource>
       </n.1:RDF>""";
 
+  private static final String dataWithDefaultNamespacesInput = """
+      <RDF
+          xmlns="http://example.com/default_A/"
+          xmlns:n.2="http://example.com/2/"
+          xmlns:n.3="http://example.com/3/">
+        <Resource>
+          <property2A xmlns="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+            <Resource n.1:about="http://example.com/items/2" xmlns="http://example.com/default_A/" xmlns:n.1="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+              <n.2:property2B>
+                <n.2:Resource n.1:about="http://example.com/items/4">
+                  <property2A n.1:resource="http://example.com/items/2"/>
+                </n.2:Resource>
+              </n.2:property2B>
+            </Resource>
+          </property2A>
+        </Resource>
+      </RDF>""";
+
+  private static final String getDataWithDefaultNamespacesOutput = """
+      <?xml version="1.0" ?>
+      <RDF xmlns="http://example.com/default_A/" xmlns:n.2="http://example.com/2/" xmlns:n.3="http://example.com/3/">
+        <Resource>
+          <property2A xmlns:rdf0="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns="http://www.w3.org/1999/02/22-rdf-syntax-ns#" rdf0:resource="http://example.com/items/2"></property2A>
+        </Resource>
+        <Resource xmlns="http://example.com/default_A/" xmlns:n.1="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:rdf0="http://www.w3.org/1999/02/22-rdf-syntax-ns#" n.1:about="http://example.com/items/2">
+          <n.2:property2B n.1:resource="http://example.com/items/4"></n.2:property2B>
+        </Resource>
+        <n.2:Resource xmlns="http://example.com/default_A/" xmlns:n.1="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:rdf0="http://www.w3.org/1999/02/22-rdf-syntax-ns#" n.1:about="http://example.com/items/4">
+          <property2A n.1:resource="http://example.com/items/2"></property2A>
+        </n.2:Resource>
+      </RDF>""";
+
   @Test
   void testData() throws XMLStreamException, RdfComplianceException {
     assertEquals(goodDataOutput, RdfXmlHierarchyNormalization.normalizeHierarchy(goodDataInput));
@@ -147,5 +179,7 @@ public class RdfXmlHierarchyNormalizationTest {
         () -> RdfXmlHierarchyNormalization.normalizeHierarchy(propertyWithTwoChildrenInput));
     assertThrows(RdfComplianceException.class,
         () -> RdfXmlHierarchyNormalization.normalizeHierarchy(propertyWithConflictingReferenceInput));
+    assertEquals(getDataWithDefaultNamespacesOutput,
+        RdfXmlHierarchyNormalization.normalizeHierarchy(dataWithDefaultNamespacesInput));
   }
 }

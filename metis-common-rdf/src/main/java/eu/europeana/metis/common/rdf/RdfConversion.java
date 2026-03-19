@@ -6,7 +6,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 import javax.xml.stream.XMLStreamException;
 import org.apache.jena.rdf.model.Model;
@@ -62,7 +61,7 @@ public final class RdfConversion {
       String baseUrl) {
     final ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
     convertRdf(new ByteArrayInputStream(content.getBytes()), from, to, baseUrl, outputStream);
-    return outputStream.toString(StandardCharsets.UTF_8);
+    return outputStream.toString();
   }
 
   /**

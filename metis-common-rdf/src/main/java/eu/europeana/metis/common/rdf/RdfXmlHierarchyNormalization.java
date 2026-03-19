@@ -1,7 +1,8 @@
 package eu.europeana.metis.common.rdf;
 
+import java.io.ByteArrayOutputStream;
+import java.io.OutputStream;
 import java.io.StringReader;
-import java.io.StringWriter;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -15,6 +16,7 @@ import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
+import javax.xml.XMLConstants;
 import javax.xml.namespace.QName;
 import javax.xml.stream.XMLEventFactory;
 import javax.xml.stream.XMLEventReader;
@@ -110,6 +112,22 @@ public final class RdfXmlHierarchyNormalization {
    */
   public static String normalizeHierarchy(String content)
       throws XMLStreamException, RdfComplianceException {
+    final ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    normalizeHierarchy(content, outputStream);
+    return outputStream.toString();
+  }
+
+  /**
+   * Perform hierarchy normalization on the provided content.
+   *
+   * @param content The content to normalize.
+   * @param result  The stream where the result is to be written. Content will be written in the
+   *                default character encoding.
+   * @throws XMLStreamException     Unexpected processing errors (typically RDF compliance issues).
+   * @throws RdfComplianceException When RDF non-compliance is detected.
+   */
+  public static void normalizeHierarchy(String content, OutputStream result)
+      throws XMLStreamException, RdfComplianceException {
 
     // Set up the input with the XML data as provided.
     final XMLEventFactory eventFactory = XMLEventFactory.newInstance();
@@ -161,13 +179,9 @@ public final class RdfXmlHierarchyNormalization {
       }
     }
 
-    // Set up the output for the normalized XML data.
-    final StringWriter flattenedWriter = new StringWriter();
-    final XMLEventWriter writer = XMLOutputFactory.newInstance().createXMLEventWriter(flattenedWriter);
+    // Write the output for the normalized XML data.
+    final XMLEventWriter writer = XMLOutputFactory.newInstance().createXMLEventWriter(result);
     new PrettyPrintingWriterWrapper(writer, eventFactory).write(topLevelSection, allNestedSections);
-
-    // Done
-    return flattenedWriter.toString();
   }
 
   /**
@@ -203,16 +217,19 @@ public final class RdfXmlHierarchyNormalization {
      */
     private final List<Characters> characterBuffer = new ArrayList<>();
 
-    // TODO default namespaces are not supported? They work exactly like regular ones, except that
-    //  their prefix is null (and there can only be one)?
-    // TODO also do namespace cleanup some way (less urgent)? If we extract and move a whole section
-    //  some namespace declarations may no longer be needed. This is not an issue, but it would be
-    //  cleaner if they were to be removed.
+    // TODO also do namespace sorting and cleanup some way (less urgent)? If we extract and move a
+    //  whole section some namespace declarations may no longer be needed. Or they may be duplicate
+    //  (already defined identically further up in the hierarchy). This is not a correctness issue,
+    //  but it would be cleaner if they were to be removed.
     /**
      * List of inherited namespaces (declared in all parent elements of this section). These
      * namespaces will all need to be declared specifically if we move this nested section to be a
      * child of the root element. Namespaces that are declared in the root element are therefore
-     * not included.
+     * not included. Note: a default namespace declaration has prefix <code>""</code> (the empty
+     * string - see {@link javax.xml.XMLConstants#DEFAULT_NS_PREFIX}). This prefix cannot occur
+     * otherwise. As a consequence, the map by prefix will also work naturally for default
+     * namespace declarations. Note that default namespaces don't apply to attributes, just to
+     * element names.
      */
     private final Map<String, Namespace> inheritedNamespaces;
 
@@ -357,8 +374,9 @@ public final class RdfXmlHierarchyNormalization {
       // Note: it is possible for a namespace to be declared in the additional namespaces but not in
       // the namespace context. This is because it may have been added earlier during processing
       // (i.e., in a parent element when a parent section was extracted).
+      // Note that we don't accept default namespaces: attributes don't work with them.
       String rdfPrefix = currentElement.getNamespaceContext().getPrefix(RDF_NAMESPACE);
-      if (rdfPrefix == null) {
+      if (rdfPrefix == null || XMLConstants.DEFAULT_NS_PREFIX.equals(rdfPrefix)) {
         rdfPrefix = getCurrentAdditionalNamespaces().entrySet().stream()
             .filter(entry -> entry.getValue().getNamespaceURI().equals(RDF_NAMESPACE))
             .map(Entry::getKey).findAny().orElse(null);
@@ -371,8 +389,10 @@ public final class RdfXmlHierarchyNormalization {
       // but not in the namespace context (it may have been added earlier during processing), this
       // will only happen for this namespace, and would therefore have been detected above. But we
       // check just to be sure.
-      final boolean newNamespaceNeeded = rdfPrefix == null;
-      if (rdfPrefix == null) {
+      // Note that we don't accept default namespaces: attributes don't work with them.
+      final boolean newNamespaceNeeded = rdfPrefix == null
+          || XMLConstants.DEFAULT_NS_PREFIX.equals(rdfPrefix);
+      if (newNamespaceNeeded) {
         final Map<String, Namespace> additionalNamespaces = getCurrentAdditionalNamespaces();
         for (int i = 0; ; i++) {
           final String candidatePrefix = "rdf" + i;
@@ -424,7 +444,7 @@ public final class RdfXmlHierarchyNormalization {
      * This is done by taking the inherited namespaces that this nested section came with, and
      * adding (or replacing) any new declarations that were found within this nested section. We
      * need to ensure that if a new namespace is declared for a prefix, the newest (i.e., the
-     * deepest) declaration wins.
+     * 'deepest' in the hierarchy) declaration wins.
      *
      * @return The additional namespaces at the current point in the event list, in a map with the
      * prefix as key.
