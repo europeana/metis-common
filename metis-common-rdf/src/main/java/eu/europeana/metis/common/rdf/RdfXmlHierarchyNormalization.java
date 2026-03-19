@@ -131,8 +131,10 @@ public final class RdfXmlHierarchyNormalization {
 
     // Set up the input with the XML data as provided.
     final XMLEventFactory eventFactory = XMLEventFactory.newInstance();
-    final XMLEventReader reader = XMLInputFactory.newInstance()
-        .createXMLEventReader(new StringReader(content));
+    final XMLInputFactory factory = XMLInputFactory.newInstance();
+    factory.setProperty(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+    factory.setProperty(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
+    final XMLEventReader reader = factory.createXMLEventReader(new StringReader(content));
 
     // Create and bootstrap the nested section (scope) stack (that includes the top-level section)
     // and the list of sections (that excludes the top-level section). Note: we will add new
