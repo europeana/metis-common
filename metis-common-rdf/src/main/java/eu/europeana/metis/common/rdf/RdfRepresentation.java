@@ -12,7 +12,7 @@ import org.apache.jena.riot.Lang;
 public enum RdfRepresentation {
 
   XML(Lang.RDFXML, Set.of("application/xml", "text/xml", "application/rdf+xml"), ".rdf"),
-  TTL(Lang.TTL, Set.of("text/ttl"), ".ttl"),
+  TTL(Lang.TTL, Set.of("text/turtle"), ".ttl"),
   NT(Lang.NT, Set.of("application/n-triples"), ".nt");
 
   private final Lang lang;
