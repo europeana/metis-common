@@ -98,6 +98,18 @@ import javax.xml.stream.events.XMLEvent;
  */
 public final class RdfXmlHierarchyNormalization {
 
+  // TODO also do namespace sorting and cleanup some way (less urgent)? If we extract and move a
+  //  whole section some namespace declarations may no longer be needed. Or they may be duplicate
+  //  (already defined identically further up in the hierarchy). This is not a correctness issue,
+  //  but it would be cleaner if they were to be removed.
+  //  Another solution is to move all namespaces to the top. Collect them all, assign prefixes
+  //  to them, put them in the root element and emit all following statements with adjusted prefixes.
+  // TODO We could perhaps stream it better by writing each section as we complete it. Then
+  //  we don't keep so much in memory (assuming there are not so many levels of nesting and that
+  //  sections are relatively small and that the top-level section does not contain so much own
+  //  content). The problem is that this may not work with the namespace improvements as suggested
+  //  above.
+
   private static final String RDF_NAMESPACE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
   private static final String RDF_ABOUT = "about";
   private static final String RDF_RESOURCE = "resource";
@@ -395,10 +407,6 @@ public final class RdfXmlHierarchyNormalization {
      */
     private final List<Characters> characterBuffer = new ArrayList<>();
 
-    // TODO also do namespace sorting and cleanup some way (less urgent)? If we extract and move a
-    //  whole section some namespace declarations may no longer be needed. Or they may be duplicate
-    //  (already defined identically further up in the hierarchy). This is not a correctness issue,
-    //  but it would be cleaner if they were to be removed.
     /**
      * List of inherited namespaces (declared in all parent elements of this section). These
      * namespaces will all need to be declared specifically if we move this nested section to be a
