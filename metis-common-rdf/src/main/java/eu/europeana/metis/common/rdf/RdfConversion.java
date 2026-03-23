@@ -9,8 +9,6 @@ import java.nio.charset.Charset;
 import java.util.Optional;
 import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.ModelFactory;
-import org.apache.jena.rdf.model.Statement;
-import org.apache.jena.rdf.model.StmtIterator;
 import org.apache.jena.riot.RDFDataMgr;
 import org.apache.jena.riot.RiotException;
 
@@ -36,11 +34,6 @@ import org.apache.jena.riot.RiotException;
  * </p>
  */
 public final class RdfConversion {
-
-  // This domain name is reserved and with the unique ID should never occur in the wild. Also, as
-  // there is no path component after the domain name, this will serve to detect relative URLs
-  // starting with / as well (i.e., URLs relative to the domain).
-  static final String DEFAULT_BASE_URL = "http://7e894f24-c379-4cd8-9698-902d3f279732.example.com/";
 
   private RdfConversion() {
   }
@@ -83,7 +76,7 @@ public final class RdfConversion {
 
     // Read the data to a model.
     final String nonNullBaseUrl = Optional.ofNullable(baseUrl)
-        .filter(value -> !value.isBlank()).orElse(DEFAULT_BASE_URL);
+        .filter(value -> !value.isBlank()).orElse(RdfBaseUrlUtils.DEFAULT_BASE_URL);
     final Model model = ModelFactory.createDefaultModel();
     try {
       RDFDataMgr.read(model, content, nonNullBaseUrl, from.getLang());
@@ -92,37 +85,14 @@ public final class RdfConversion {
     }
 
     // Check if there were relative URLs without a provided base URL.
-    if (DEFAULT_BASE_URL.equals(nonNullBaseUrl) && containsDefaultBaseUrl(model)) {
+    if (RdfBaseUrlUtils.DEFAULT_BASE_URL.equals(nonNullBaseUrl) &&
+        RdfBaseUrlUtils.containsDefaultBaseUrl(model)) {
       throw new IllegalArgumentException(
           "This data has relative URLs and a base URL should be provided to convert it.");
     }
 
     // Write to a String.
     RDFDataMgr.write(result, model, to.getLang());
-  }
-
-  /**
-   * Detects whether the default base url is used as a namespace anywhere in the model. This can be
-   * used to check
-   *
-   * @param model The model to check.
-   * @return Whether the default base url is used.
-   */
-  private static boolean containsDefaultBaseUrl(Model model) {
-    final StmtIterator statements = model.listStatements();
-    try {
-      for (Statement statement : (Iterable<? extends Statement>) () -> statements) {
-        if (statement.getSubject().toString().startsWith(DEFAULT_BASE_URL) ||
-            statement.getPredicate().toString().startsWith(DEFAULT_BASE_URL) ||
-            (statement.getObject().isResource() &&
-                statement.getObject().asResource().toString().startsWith(DEFAULT_BASE_URL))) {
-          return true;
-        }
-      }
-    } finally {
-      statements.close();
-    }
-    return false;
   }
 
   /**
