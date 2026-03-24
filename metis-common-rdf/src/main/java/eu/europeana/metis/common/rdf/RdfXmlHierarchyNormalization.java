@@ -1,8 +1,8 @@
 package eu.europeana.metis.common.rdf;
 
-import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
 import java.io.StringReader;
+import java.io.StringWriter;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -109,11 +109,16 @@ public final class RdfXmlHierarchyNormalization {
   //  we don't keep so much in memory (assuming there are not so many levels of nesting and that
   //  sections are relatively small and that the top-level section does not contain so much own
   //  content). The problem is that this may not work with the namespace improvements as suggested
-  //  above.
+  //  above. If we succeed, also allow for streamed input.
 
   private static final String RDF_NAMESPACE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
   private static final String RDF_ABOUT = "about";
   private static final String RDF_RESOURCE = "resource";
+
+  private interface XmlEventWriterCreator {
+
+    XMLEventWriter create() throws XMLStreamException;
+  }
 
   private RdfXmlHierarchyNormalization() {
   }
@@ -126,39 +131,34 @@ public final class RdfXmlHierarchyNormalization {
    * @throws ComplianceException When non-compliance is detected.
    */
   public static String normalizeHierarchy(String content) throws ComplianceException {
-    final ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-    normalizeHierarchy(content, outputStream);
-    return outputStream.toString();
+    final StringWriter result = new StringWriter();
+    normalizeHierarchy(content, () -> XMLOutputFactory.newInstance().createXMLEventWriter(result));
+    return result.toString();
   }
 
   /**
    * Perform hierarchy normalization on the provided content.
    *
    * @param content The content to normalize.
-   * @param result  The stream where the result is to be written. Content will be written in the
-   *                default character encoding.
+   * @param result  The stream where the result is to be written.
    * @throws ComplianceException When non-compliance is detected.
    */
   public static void normalizeHierarchy(String content, OutputStream result)
       throws ComplianceException {
+    normalizeHierarchy(content, () -> XMLOutputFactory.newInstance().createXMLEventWriter(result));
+  }
+
+  private static void normalizeHierarchy(String content, XmlEventWriterCreator writerCreator)
+      throws ComplianceException {
     try {
-      normalizeHierarchyInternal(content, result);
+      normalizeHierarchyInternal(content, writerCreator);
     } catch (XMLStreamException e) {
       throw new XmlComplianceException("XML Noncompliance detected. " + e.getMessage(), e);
     }
   }
 
-  /**
-   * Perform hierarchy normalization on the provided content.
-   *
-   * @param content The content to normalize.
-   * @param result  The stream where the result is to be written. Content will be written in the
-   *                default character encoding.
-   * @throws XMLStreamException     When XML non-compliance is detected.
-   * @throws RdfComplianceException When RDF non-compliance is detected.
-   */
-  private static void normalizeHierarchyInternal(String content, OutputStream result)
-      throws XMLStreamException, RdfComplianceException {
+  private static void normalizeHierarchyInternal(String content,
+      XmlEventWriterCreator writerCreator) throws XMLStreamException, RdfComplianceException {
 
     // Set up the input with the XML data as provided.
     final XMLEventFactory eventFactory = XMLEventFactory.newInstance();
@@ -213,8 +213,8 @@ public final class RdfXmlHierarchyNormalization {
     }
 
     // Write the output for the normalized XML data.
-    final XMLEventWriter writer = XMLOutputFactory.newInstance().createXMLEventWriter(result);
-    new PrettyPrintingWriterWrapper(writer, eventFactory).write(topLevelSection, allNestedSections);
+    new PrettyPrintingWriterWrapper(writerCreator.create(), eventFactory)
+        .write(topLevelSection, allNestedSections);
   }
 
   /**

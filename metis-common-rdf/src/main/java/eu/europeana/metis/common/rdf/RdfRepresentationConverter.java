@@ -5,13 +5,18 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.StringReader;
+import java.io.StringWriter;
 import java.nio.charset.Charset;
 import java.util.Optional;
+import java.util.function.Consumer;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.ModelFactory;
-import org.apache.jena.riot.RDFDataMgr;
-import org.apache.jena.riot.RiotException;
+import org.apache.jena.riot.RDFParser;
+import org.apache.jena.riot.RDFParserBuilder;
+import org.apache.jena.riot.RDFWriter;
+import org.apache.jena.riot.RDFWriterRegistry;
 
 /**
  * <p>
@@ -41,8 +46,8 @@ public final class RdfRepresentationConverter {
 
   /**
    * Convert RDF content from one representation to another. Note that this conversion is performed
-   * even if the two representations are identical. A call to this method can then serve to
-   * verify the content and achieve more consistency (a kind of 'normalization').
+   * even if the two representations are identical. A call to this method can then serve to verify
+   * the content and achieve more consistency (a kind of 'normalization').
    *
    * @param content The content as a String.
    * @param from    The representation of the source.
@@ -51,12 +56,14 @@ public final class RdfRepresentationConverter {
    *                exception is thrown if relative URLs are encountered.
    * @return The content in the new representation.
    * @throws ComplianceException When input was found to be noncompliant.
+   * @throws IOException         When the result could not be written to the destination.
    */
   public static String convertRdf(String content, RdfRepresentation from, RdfRepresentation to,
-      String baseUrl) throws ComplianceException {
-    final ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-    convertRdf(new ByteArrayInputStream(content.getBytes()), from, to, baseUrl, outputStream);
-    return outputStream.toString();
+      String baseUrl) throws ComplianceException, IOException {
+    final StringWriter result = new StringWriter();
+    convertRdf(parser -> parser.source(new StringReader(content)), from, to, baseUrl,
+        writer -> writer.output(result));
+    return result.toString();
   }
 
   /**
@@ -71,17 +78,27 @@ public final class RdfRepresentationConverter {
    *                exception is thrown if relative URLs are encountered.
    * @param result  The stream where the result is to be written.
    * @throws ComplianceException When input was found to be noncompliant.
+   * @throws IOException         When the result could not be written to the destination.
    */
   public static void convertRdf(InputStream content, RdfRepresentation from, RdfRepresentation to,
-      String baseUrl, OutputStream result) throws ComplianceException {
+      String baseUrl, OutputStream result) throws ComplianceException, IOException {
+    convertRdf(builder -> builder.source(content), from, to, baseUrl,
+        writer -> writer.output(result));
+  }
+
+  private static void convertRdf(Consumer<RDFParserBuilder> sourceSetter, RdfRepresentation from,
+      RdfRepresentation to, String baseUrl, Consumer<RDFWriter> outputWriter)
+      throws ComplianceException, IOException {
 
     // Read the data to a model.
     final String nonNullBaseUrl = Optional.ofNullable(baseUrl)
         .filter(StringUtils::isNotBlank).orElse(RdfBaseUrlUtils.DEFAULT_BASE_URL);
     final Model model = ModelFactory.createDefaultModel();
     try {
-      RDFDataMgr.read(model, content, nonNullBaseUrl, from.getLang());
-    } catch (RiotException e) {
+      final RDFParserBuilder parser = RDFParser.create().base(nonNullBaseUrl).lang(from.getLang());
+      sourceSetter.accept(parser);
+      parser.build().parse(model);
+    } catch (RuntimeException e) {
       throw new ComplianceException("Input was found to be noncompliant. " + e.getMessage(), e);
     }
 
@@ -93,7 +110,13 @@ public final class RdfRepresentationConverter {
     }
 
     // Done. Write the result.
-    RDFDataMgr.write(result, model, to.getLang());
+    try {
+      final RDFWriter writer = RDFWriter.create().source(model)
+          .format(RDFWriterRegistry.defaultSerialization(to.getLang())).build();
+      outputWriter.accept(writer);
+    } catch (RuntimeException e) {
+      throw new IOException("Could not write to the required output: " + e.getMessage(), e);
+    }
   }
 
   /**
@@ -106,9 +129,10 @@ public final class RdfRepresentationConverter {
    *                exception is thrown if relative URLs are encountered.
    * @return The content in the XML representation.
    * @throws ComplianceException When input was found to be noncompliant.
+   * @throws IOException         When the result could not be written to the destination.
    */
   public static String convertToXmlAndNormalizeHierarchy(String content, RdfRepresentation from,
-      String baseUrl) throws ComplianceException {
+      String baseUrl) throws ComplianceException, IOException {
     return convertToXmlAndNormalizeHierarchy(new ByteArrayInputStream(content.getBytes()), from,
         baseUrl);
   }
@@ -123,9 +147,10 @@ public final class RdfRepresentationConverter {
    *                exception is thrown if relative URLs are encountered.
    * @return The content in the XML representation.
    * @throws ComplianceException When input was found to be noncompliant.
+   * @throws IOException         When the result could not be written to the destination.
   */
   public static String convertToXmlAndNormalizeHierarchy(InputStream content,
-      RdfRepresentation from, String baseUrl) throws ComplianceException {
+      RdfRepresentation from, String baseUrl) throws ComplianceException, IOException {
     final ByteArrayOutputStream convertedRecord = new ByteArrayOutputStream();
     convertRdf(content, from, RdfRepresentation.XML, baseUrl, convertedRecord);
     try {
@@ -147,7 +172,7 @@ public final class RdfRepresentationConverter {
    * @param result  The stream where the result is to be written. Content will be written in the
    *                default character encoding.
    * @throws ComplianceException When input was found to be noncompliant.
-   * @throws IOException When something went wrong while writing to the provided output stream.
+   * @throws IOException         When the result could not be written to the destination.
    */
   public static void convertToXmlAndNormalizeHierarchy(InputStream content, RdfRepresentation from,
       String baseUrl, OutputStream result) throws ComplianceException, IOException {
