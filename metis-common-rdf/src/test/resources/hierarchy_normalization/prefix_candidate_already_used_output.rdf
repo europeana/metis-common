@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<rdf0:Root xmlns:rdf0="http://example.com/rdf0">
+  <rdf0:Resource>
+    <rdf1:property xmlns:rdf2="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:rdf1="http://example.com/rdf1" rdf2:resource="http://example.com/items/A"></rdf1:property>
+  </rdf0:Resource>
+  <rdf0:Resource xmlns:rdf1="http://example.com/rdf1" xmlns:n.1="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:rdf2="http://www.w3.org/1999/02/22-rdf-syntax-ns#" n.1:about="http://example.com/items/A">
+    <rdf1:property xmlns:n.1="http://example.com/1" rdf2:resource="http://example.com/items/B"></rdf1:property>
+  </rdf0:Resource>
+  <rdf0:Resource xmlns:rdf1="http://example.com/rdf1" xmlns:n.1="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:rdf2="http://www.w3.org/1999/02/22-rdf-syntax-ns#" n.1:about="http://example.com/items/B">
+    <rdf0:label>TEST</rdf0:label>
+  </rdf0:Resource>
+</rdf0:Root>

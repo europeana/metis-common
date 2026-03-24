@@ -7,6 +7,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.Charset;
 import java.util.Optional;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.ModelFactory;
 import org.apache.jena.riot.RDFDataMgr;
@@ -33,9 +34,9 @@ import org.apache.jena.riot.RiotException;
  * individual records and contextual items).
  * </p>
  */
-public final class RdfConversion {
+public final class RdfRepresentationConverter {
 
-  private RdfConversion() {
+  private RdfRepresentationConverter() {
   }
 
   /**
@@ -76,7 +77,7 @@ public final class RdfConversion {
 
     // Read the data to a model.
     final String nonNullBaseUrl = Optional.ofNullable(baseUrl)
-        .filter(value -> !value.isBlank()).orElse(RdfBaseUrlUtils.DEFAULT_BASE_URL);
+        .filter(StringUtils::isNotBlank).orElse(RdfBaseUrlUtils.DEFAULT_BASE_URL);
     final Model model = ModelFactory.createDefaultModel();
     try {
       RDFDataMgr.read(model, content, nonNullBaseUrl, from.getLang());
@@ -87,11 +88,11 @@ public final class RdfConversion {
     // Check if there were relative URLs without a provided base URL.
     if (RdfBaseUrlUtils.DEFAULT_BASE_URL.equals(nonNullBaseUrl) &&
         RdfBaseUrlUtils.containsDefaultBaseUrl(model)) {
-      throw new IllegalArgumentException(
+      throw new ComplianceException(
           "This data has relative URLs and a base URL should be provided to convert it.");
     }
 
-    // Write to a String.
+    // Done. Write the result.
     RDFDataMgr.write(result, model, to.getLang());
   }
 
@@ -125,7 +126,7 @@ public final class RdfConversion {
   */
   public static String convertToXmlAndNormalizeHierarchy(InputStream content,
       RdfRepresentation from, String baseUrl) throws ComplianceException {
-    ByteArrayOutputStream convertedRecord = new ByteArrayOutputStream();
+    final ByteArrayOutputStream convertedRecord = new ByteArrayOutputStream();
     convertRdf(content, from, RdfRepresentation.XML, baseUrl, convertedRecord);
     try {
       return RdfXmlHierarchyNormalization

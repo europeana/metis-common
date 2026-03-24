@@ -29,6 +29,7 @@ import javax.xml.stream.events.Characters;
 import javax.xml.stream.events.Namespace;
 import javax.xml.stream.events.StartElement;
 import javax.xml.stream.events.XMLEvent;
+import org.apache.commons.lang3.StringUtils;
 
 /**
  * <p>This class implements hierarchy normalization on the element hierarchy in RDF+XML content. The
@@ -42,30 +43,30 @@ import javax.xml.stream.events.XMLEvent;
  * untouched. The result will be made "pretty": indented with an indent of 2 spaces.
  * </p>
  * <p>For example, consider the following XML (omitting the namespace declarations):</p>
- * {@snippet lang = "XML":
- * <rdf:RDF>
- *   <Book rdf:about="book_1">
- *     <title>A tale of two cities</title>
- *     <hasAuthor>
- *       <Author rdf:about="author_A">
- *         <name>Charles Dickens</name>
- *       </Author>
- *     </hasAuthor>
- *   </Book>
- * </rdf:RDF>
- *}
+ * <pre><code>
+ *   <rdf:RDF>
+ *     <Book rdf:about="book_1">
+ *       <title>A tale of two cities</title>
+ *       <hasAuthor>
+ *         <Author rdf:about="author_A">
+ *           <name>Charles Dickens</name>
+ *         </Author>
+ *       </hasAuthor>
+ *     </Book>
+ *   </rdf:RDF>
+ * </code></pre>
  * <p>Hierarchy normalization will transform this data into the following equivalent structure:</p>
- * {@snippet lang = "XML":
- * <rdf:RDF>
- *   <Book rdf:about="book_1">
- *     <title>A tale of two cities</title>
- *     <hasAuthor rdf:resource="author_A"></hasAuthor>
- *   </Book>
- *   <Author rdf:about="author_A">
- *     <name>Charles Dickens</name>
- *   </Author>
- * </rdf:RDF>
- *}
+ * <pre><code>
+ *   <rdf:RDF>
+ *     <Book rdf:about="book_1">
+ *       <title>A tale of two cities</title>
+ *       <hasAuthor rdf:resource="author_A"></hasAuthor>
+ *     </Book>
+ *     <Author rdf:about="author_A">
+ *       <name>Charles Dickens</name>
+ *     </Author>
+ *   </rdf:RDF>
+ * </code></pre>
  * <p>Note that we have extracted the nested object (<code>Author</code>) from the containing one
  * (<code>Book</code> and moved it up to the root level. In order to preserve the relation, we
  * instead added a <code>rdf:resource</code> reference where the nested object was.
@@ -189,7 +190,7 @@ public final class RdfXmlHierarchyNormalization {
         final StartElement element = currentEvent.asStartElement();
         final String elementId = Optional.ofNullable(element.getAttributeByName(
                 new QName(RDF_NAMESPACE, RDF_ABOUT)))
-            .map(Attribute::getValue).filter(id -> !id.isBlank()).orElse(null);
+            .map(Attribute::getValue).filter(StringUtils::isNotBlank).orElse(null);
         if (elementId != null) {
           setReferenceForCurrentElement(elementId, sectionStack.getLast(), eventFactory);
           final NestedSection nestedSection = new NestedSection(false,
@@ -512,7 +513,7 @@ public final class RdfXmlHierarchyNormalization {
     }
 
     private String createNewLineAndIndent() {
-      return "\n" + " ".repeat(depthCounter * INDENT_SIZE);
+      return System.lineSeparator() + " ".repeat(depthCounter * INDENT_SIZE);
     }
 
     private void writeEvent(XMLEvent event) throws XMLStreamException {
