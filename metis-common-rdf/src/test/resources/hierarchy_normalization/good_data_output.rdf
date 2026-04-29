@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<n.1:RDF xmlns:n.1="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:n.2="http://example.com/2/" xmlns:n.3="http://example.com/3/">
+  <n.2:Resource n.1:about="http://example.com/items/5">
+    <n.3:label xml:lang="nl">Resource 6 label 1</n.3:label>
+    <n.3:label xml:lang="en">Resource 6 label 2</n.3:label>
+  </n.2:Resource>
+  <n.2:Resource xmlns:n.a="http://example.com/A/" n.1:about="http://example.com/items/1">
+    <n.2:property2A xmlns:rdf0="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:n.b="http://example.com/B/" xmlns:n.1="http://example.com/1/" rdf0:resource="http://example.com/items/2"></n.2:property2A>
+  </n.2:Resource>
+  <n.2:Resource xmlns:n.a="http://example.com/A/" xmlns:n.1="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:rdf0="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:n.b="http://example.com/B/" n.1:about="http://example.com/items/2">
+    <n.a:test>TEST A</n.a:test>
+    <n.b:test>TEST B</n.b:test>
+    <n.2:property2B xmlns:n.a="http://example.com/Aprime/" n.1:resource="http://example.com/items/3"></n.2:property2B>
+    <n.2:property2C n.1:resource="http://example.com/items/4"></n.2:property2C>
+    <n.2:label>label without language</n.2:label>
+    <n.2:label>another label without language</n.2:label>
+    <n.2:property2D n.1:resource="http://example.com/items/1"></n.2:property2D>
+    <n.2:property2E n.1:resource="http://example.com/items/4"></n.2:property2E>
+    <n.2:property2F n.1:resource="http://example.com/items/5"></n.2:property2F>
+  </n.2:Resource>
+  <n.2:Resource xmlns:n.a="http://example.com/Aprime/" xmlns:n.1="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:rdf0="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:n.c="http://example.com/C/" xmlns:n.b="http://example.com/B/" n.1:about="http://example.com/items/3">
+    <n.a:test>TEST A PRIME</n.a:test>
+    <n.b:test>TEST B</n.b:test>
+    <n.c:test>TEST C</n.c:test>
+  </n.2:Resource>
+  <n.2:Resource xmlns:n.a="http://example.com/A/" xmlns:n.1="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:rdf0="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:n.b="http://example.com/B/" n.1:about="http://example.com/items/4">
+    <n.2:property2A n.1:resource="http://example.com/items/2"></n.2:property2A>
+  </n.2:Resource>
+</n.1:RDF>

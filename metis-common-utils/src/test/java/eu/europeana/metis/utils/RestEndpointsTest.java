@@ -32,7 +32,6 @@ import static eu.europeana.metis.utils.RestEndpoints.DEREFERENCE;
 import static eu.europeana.metis.utils.RestEndpoints.LOAD_VOCABULARIES;
 import static eu.europeana.metis.utils.RestEndpoints.ORCHESTRATOR_PROXIES_RECORDS;
 import static eu.europeana.metis.utils.RestEndpoints.ORCHESTRATOR_PROXIES_RECORDS_BY_IDS;
-import static eu.europeana.metis.utils.RestEndpoints.ORCHESTRATOR_PROXIES_TOPOLOGY_TASK_LOGS;
 import static eu.europeana.metis.utils.RestEndpoints.ORCHESTRATOR_PROXIES_TOPOLOGY_TASK_NODE_STATISTICS;
 import static eu.europeana.metis.utils.RestEndpoints.ORCHESTRATOR_PROXIES_TOPOLOGY_TASK_REPORT;
 import static eu.europeana.metis.utils.RestEndpoints.ORCHESTRATOR_PROXIES_TOPOLOGY_TASK_REPORT_EXISTS;
@@ -49,8 +48,6 @@ import static eu.europeana.metis.utils.RestEndpoints.ORCHESTRATOR_WORKFLOWS_EXEC
 import static eu.europeana.metis.utils.RestEndpoints.ORCHESTRATOR_WORKFLOWS_EXECUTIONS_EXECUTIONID;
 import static eu.europeana.metis.utils.RestEndpoints.ORCHESTRATOR_WORKFLOWS_EXECUTIONS_EXECUTIONID_PLUGINS_DATA_AVAILABILITY;
 import static eu.europeana.metis.utils.RestEndpoints.ORCHESTRATOR_WORKFLOWS_EXECUTIONS_OVERVIEW;
-import static eu.europeana.metis.utils.RestEndpoints.ORCHESTRATOR_WORKFLOWS_SCHEDULE;
-import static eu.europeana.metis.utils.RestEndpoints.ORCHESTRATOR_WORKFLOWS_SCHEDULE_DATASETID;
 import static eu.europeana.metis.utils.RestEndpoints.REPOSITORY_HTTP_ENDPOINT_ZIP;
 import static eu.europeana.metis.utils.RestEndpoints.REPOSITORY_OAI_ENDPOINT;
 import static eu.europeana.metis.utils.RestEndpoints.REPOSITORY_RECORDS;
@@ -109,8 +106,6 @@ class RestEndpointsTest {
 
         Arguments.of(ORCHESTRATOR_WORKFLOWS_DATASETID, List.of("datasetId"), "/orchestrator/workflows/datasetId"),
         Arguments.of(ORCHESTRATOR_WORKFLOWS_DATASETID_EXECUTE, List.of("datasetId"), "/orchestrator/workflows/datasetId/execute"),
-        Arguments.of(ORCHESTRATOR_WORKFLOWS_SCHEDULE, List.of(""), "/orchestrator/workflows/schedule"),
-        Arguments.of(ORCHESTRATOR_WORKFLOWS_SCHEDULE_DATASETID, List.of("datasetId"), "/orchestrator/workflows/schedule/datasetId"),
         Arguments.of(ORCHESTRATOR_WORKFLOWS_EXECUTIONS_EXECUTIONID, List.of("executionId"), "/orchestrator/workflows/executions/executionId"),
         Arguments.of(ORCHESTRATOR_WORKFLOWS_EXECUTIONS_EXECUTIONID_PLUGINS_DATA_AVAILABILITY, List.of("executionId"), "/orchestrator/workflows/executions/executionId/plugins/data-availability"),
         Arguments.of(ORCHESTRATOR_WORKFLOWS_EXECUTIONS_DATASET_DATASETID, List.of("datasetId"), "/orchestrator/workflows/executions/dataset/datasetId"),
@@ -121,7 +116,6 @@ class RestEndpointsTest {
         Arguments.of(ORCHESTRATOR_WORKFLOWS_EXECUTIONS, List.of(""), "/orchestrator/workflows/executions"),
         Arguments.of(ORCHESTRATOR_WORKFLOWS_EXECUTIONS_OVERVIEW, List.of(""), "/orchestrator/workflows/executions/overview"),
         Arguments.of(ORCHESTRATOR_WORKFLOWS_EVOLUTION, List.of("workflowExecutionId","pluginType"), "/orchestrator/workflows/evolution/workflowExecutionId/pluginType"),
-        Arguments.of(ORCHESTRATOR_PROXIES_TOPOLOGY_TASK_LOGS, List.of("topologyName","externalTaskId"), "/orchestrator/proxies/topologyName/task/externalTaskId/logs"),
         Arguments.of(ORCHESTRATOR_PROXIES_TOPOLOGY_TASK_REPORT, List.of("topologyName","externalTaskId"), "/orchestrator/proxies/topologyName/task/externalTaskId/report"),
         Arguments.of(ORCHESTRATOR_PROXIES_TOPOLOGY_TASK_REPORT_EXISTS, List.of("topologyName","externalTaskId"), "/orchestrator/proxies/topologyName/task/externalTaskId/report/exists"),
         Arguments.of(ORCHESTRATOR_PROXIES_TOPOLOGY_TASK_STATISTICS, List.of("topologyName","externalTaskId"), "/orchestrator/proxies/topologyName/task/externalTaskId/statistics"),

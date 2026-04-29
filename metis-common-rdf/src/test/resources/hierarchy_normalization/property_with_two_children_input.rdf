@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<n.1:RDF xmlns:n.1="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:n.2="http://example.com/2/">
+  <n.2:Resource>
+    <n.2:property>
+      <n.2:Resource>
+        <n.2:label>Resource A</n.2:label>
+      </n.2:Resource>
+      <n.2:Resource n.1:about="http://example.com/items/B">
+        <n.2:label>Resource B</n.2:label>
+      </n.2:Resource>
+    </n.2:property2A>
+  </n.1:Resource>
+</n.1:RDF>

@@ -5,7 +5,7 @@
   <groupId>eu.europeana.metis</groupId>
   <artifactId>metis-common</artifactId>
   <packaging>pom</packaging>
-  <version>18</version>
+  <version>19</version>
 
   <modules>
     <module>metis-common-base</module>
@@ -13,6 +13,7 @@
     <module>metis-common-network</module>
     <module>metis-common-security</module>
     <module>metis-common-utils</module>
+    <module>metis-common-rdf</module>
     <module>metis-common-solr</module>
     <module>metis-common-spring-properties</module>
   </modules>
@@ -35,19 +36,17 @@
     <version.maven.release.plugin>2.5.3</version.maven.release.plugin>
 
     <!--Internal-->
-    <version.metis-schema>13</version.metis-schema>
-    <version.corelib>2.17.6</version.corelib>
+    <version.metis-schema>14</version.metis-schema>
+    <version.corelib>2.17.7-SNAPSHOT</version.corelib>
 
     <!--External-->
-    <version.spring>6.1.5</version.spring>
-    <version.spring.boot>3.4.10</version.spring.boot>
+    <version.spring.boot>4.0.1</version.spring.boot>
     <version.apache.httpclient5>5.4.1</version.apache.httpclient5>
     <version.apache.httpcore5>5.3.1</version.apache.httpcore5>
     <version.jakarta.ws.rs.api>3.1.0</version.jakarta.ws.rs.api>
     <version.elastic.apm>1.48.1</version.elastic.apm>
     <version.commons-compress>1.26.0</version.commons-compress>
     <version.morphia.core>2.5.1</version.morphia.core>
-    <version.jackson>2.16.1</version.jackson>
     <version.solr.solrj>8.8.2</version.solr.solrj>
     <version.jersey>3.1.5</version.jersey>
     <version.commons.io>2.14.0</version.commons.io>
@@ -55,10 +54,9 @@
     <version.commons.collections4>4.4</version.commons.collections4>
     <version.jetbrains>24.0.1</version.jetbrains>
     <version.embedded.mongo>4.18.1</version.embedded.mongo>
-    <version.mockito.core>4.3.1</version.mockito.core>
-    <version.junit>5.11.4</version.junit>
     <version.log4j>2.23.0</version.log4j>
     <version.slf4j>2.0.12</version.slf4j>
+    <version.jena>6.0.0</version.jena>
   </properties>
 
   <dependencyManagement>
@@ -263,24 +261,6 @@
         <groupId>org.jetbrains</groupId>
         <artifactId>annotations</artifactId>
         <version>${version.jetbrains}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.junit.jupiter</groupId>
-        <artifactId>junit-jupiter-api</artifactId>
-        <version>${version.junit}</version>
-        <scope>test</scope>
-      </dependency>
-      <dependency>
-        <groupId>org.junit.jupiter</groupId>
-        <artifactId>junit-jupiter-engine</artifactId>
-        <scope>test</scope>
-        <version>${version.junit}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.mockito</groupId>
-        <artifactId>mockito-core</artifactId>
-        <version>${version.mockito.core}</version>
-        <scope>test</scope>
       </dependency>
     </dependencies>
   </dependencyManagement>

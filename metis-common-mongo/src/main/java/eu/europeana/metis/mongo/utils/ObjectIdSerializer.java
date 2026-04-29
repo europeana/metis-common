@@ -1,27 +1,35 @@
 package eu.europeana.metis.mongo.utils;
 
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.databind.JsonSerializer;
-import com.fasterxml.jackson.databind.SerializerProvider;
-import java.io.IOException;
 import org.bson.types.ObjectId;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.JsonGenerator;
+import tools.jackson.databind.SerializationContext;
+import tools.jackson.databind.ser.std.StdSerializer;
 
 /**
  * A json serializer for {@link ObjectId} fields.
- *
- * @author Simon Tzanakis (Simon.Tzanakis@europeana.eu)
- * @since 2017-05-15
  */
-public class ObjectIdSerializer extends JsonSerializer<ObjectId> {
+public class ObjectIdSerializer extends StdSerializer<ObjectId> {
 
-  @Override
-  public void serialize(ObjectId value, JsonGenerator jgen, SerializerProvider provider)
-      throws IOException {
-    if (value == null) {
-      jgen.writeNull();
-    } else {
-      jgen.writeString(value.toString());
+    /**
+     * Default constructor.
+     * Initializes the serializer with the {@link ObjectId} class as the target type.
+     * Note: Required, do not remove.
+     */
+    public ObjectIdSerializer() {
+        super(ObjectId.class);
     }
-  }
 
+    protected ObjectIdSerializer(Class<?> t) {
+        super(t);
+    }
+
+    @Override
+    public void serialize(ObjectId value, JsonGenerator jgen, SerializationContext provider) throws JacksonException {
+        if (value == null) {
+            jgen.writeNull();
+        } else {
+            jgen.writeString(value.toString());
+        }
+    }
 }
