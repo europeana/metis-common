@@ -13,18 +13,27 @@ class RdfXmlHierarchyNormalizationTest {
 
   @Test
   void testData() throws ComplianceException, IOException {
-    assertEquals(loadFile("good_data_output.rdf"),
-        RdfXmlHierarchyNormalization.normalizeHierarchy(loadFile("good_data_input.rdf")));
+    assertEquals(
+        normalizeLineFeed(loadFile("good_data_output.rdf")),
+        normalizeLineFeed(RdfXmlHierarchyNormalization.normalizeHierarchy(loadFile("good_data_input.rdf"))));
     final String simpleFile = loadFile("simple_data_input_and_output.rdf");
-    assertEquals(simpleFile, RdfXmlHierarchyNormalization.normalizeHierarchy(simpleFile));
-    assertEquals(loadFile("prefix_candidate_already_used_output.rdf"),
-        RdfXmlHierarchyNormalization.normalizeHierarchy(loadFile("prefix_candidate_already_used_input.rdf")));
+    assertEquals(
+        normalizeLineFeed(simpleFile),
+        normalizeLineFeed(RdfXmlHierarchyNormalization.normalizeHierarchy(simpleFile)));
+    assertEquals(
+        normalizeLineFeed(loadFile("prefix_candidate_already_used_output.rdf")),
+        normalizeLineFeed(RdfXmlHierarchyNormalization.normalizeHierarchy(loadFile("prefix_candidate_already_used_input.rdf"))));
     assertThrows(RdfComplianceException.class, () -> RdfXmlHierarchyNormalization
         .normalizeHierarchy(loadFile("property_with_two_children_input.rdf")));
     assertThrows(RdfComplianceException.class, () -> RdfXmlHierarchyNormalization
         .normalizeHierarchy(loadFile("property_with_conflicting_reference_input.rdf")));
-    assertEquals(loadFile("data_with_default_namespaces_output.rdf"),
-        RdfXmlHierarchyNormalization.normalizeHierarchy(loadFile("data_with_default_namespaces_input.rdf")));
+    assertEquals(
+        normalizeLineFeed(loadFile("data_with_default_namespaces_output.rdf")),
+        normalizeLineFeed(RdfXmlHierarchyNormalization.normalizeHierarchy(loadFile("data_with_default_namespaces_input.rdf"))));
+  }
+
+  private static String normalizeLineFeed(String s) {
+    return s.replace("\r\n", "\n").trim();
   }
 
   private static String loadFile(String fileName) throws IOException {

@@ -60,7 +60,6 @@ public final class RestEndpoints {
   public static final String ORCHESTRATOR_WORKFLOWS_EXECUTIONS = "/orchestrator/workflows/executions";
   public static final String ORCHESTRATOR_WORKFLOWS_EXECUTIONS_OVERVIEW = "/orchestrator/workflows/executions/overview";
   public static final String ORCHESTRATOR_WORKFLOWS_EVOLUTION = "/orchestrator/workflows/evolution/{workflowExecutionId}/{pluginType}";
-  public static final String ORCHESTRATOR_PROXIES_TOPOLOGY_TASK_LOGS = "/orchestrator/proxies/{topologyName}/task/{externalTaskId}/logs";
   public static final String ORCHESTRATOR_PROXIES_TOPOLOGY_TASK_REPORT = "/orchestrator/proxies/{topologyName}/task/{externalTaskId}/report";
   public static final String ORCHESTRATOR_PROXIES_TOPOLOGY_TASK_REPORT_EXISTS = "/orchestrator/proxies/{topologyName}/task/{externalTaskId}/report/exists";
   public static final String ORCHESTRATOR_PROXIES_TOPOLOGY_TASK_STATISTICS = "/orchestrator/proxies/{topologyName}/task/{externalTaskId}/statistics";
