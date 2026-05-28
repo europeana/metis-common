@@ -7,7 +7,7 @@ import static org.mockito.Mockito.verify;
 
 import java.io.IOException;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
-import org.apache.solr.client.solrj.impl.LBHttpSolrClient;
+import org.apache.solr.client.solrj.impl.HttpJdkSolrClient;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -22,7 +22,7 @@ class CompoundSolrClientTest {
 
   @Test
   void getSolrClient() {
-    final LBHttpSolrClient lbHttpSolrClient = mock(LBHttpSolrClient.class);
+    final HttpJdkSolrClient lbHttpSolrClient = mock(HttpJdkSolrClient.class);
     final CloudSolrClient cloudSolrClient = mock(CloudSolrClient.class);
 
     compoundSolrClient = new CompoundSolrClient(lbHttpSolrClient, cloudSolrClient);
@@ -33,7 +33,7 @@ class CompoundSolrClientTest {
 
   @Test
   void getSolrClientCloudSolrClientIsNull() {
-    final LBHttpSolrClient lbHttpSolrClient = mock(LBHttpSolrClient.class);
+    final HttpJdkSolrClient lbHttpSolrClient = mock(HttpJdkSolrClient.class);
 
     compoundSolrClient = new CompoundSolrClient(lbHttpSolrClient, null);
 
@@ -43,7 +43,7 @@ class CompoundSolrClientTest {
 
   @Test
   void close() throws IOException {
-    final LBHttpSolrClient lbHttpSolrClient = mock(LBHttpSolrClient.class);
+    final HttpJdkSolrClient lbHttpSolrClient = mock(HttpJdkSolrClient.class);
     final CloudSolrClient cloudSolrClient = mock(CloudSolrClient.class);
     compoundSolrClient = new CompoundSolrClient(lbHttpSolrClient, cloudSolrClient);
 

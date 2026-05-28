@@ -4,14 +4,14 @@ import java.io.Closeable;
 import java.io.IOException;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
-import org.apache.solr.client.solrj.impl.LBHttpSolrClient;
+import org.apache.solr.client.solrj.impl.HttpJdkSolrClient;
 
 /**
  * This class represents a Solr client that can internally consist of two (closeable) clients.
  */
 public class CompoundSolrClient implements Closeable {
 
-  private final LBHttpSolrClient httpSolrClient;
+  private final HttpJdkSolrClient httpSolrClient;
   private final CloudSolrClient cloudSolrClient;
 
   /**
@@ -20,7 +20,7 @@ public class CompoundSolrClient implements Closeable {
    * @param httpSolrClient the load balanced solr client
    * @param cloudSolrClient the cloud solr client
    */
-  public CompoundSolrClient(LBHttpSolrClient httpSolrClient, CloudSolrClient cloudSolrClient) {
+  public CompoundSolrClient(HttpJdkSolrClient httpSolrClient, CloudSolrClient cloudSolrClient) {
     this.httpSolrClient = httpSolrClient;
     this.cloudSolrClient = cloudSolrClient;
   }

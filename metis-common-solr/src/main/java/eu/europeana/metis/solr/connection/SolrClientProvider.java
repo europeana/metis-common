@@ -7,9 +7,10 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
-import org.apache.solr.client.solrj.impl.LBHttpSolrClient;
+import org.apache.solr.client.solrj.impl.HttpJdkSolrClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,7 +42,7 @@ public class SolrClientProvider<E extends Exception> {
    * @throws E In case there is a problem with the supplied properties.
    */
   public CompoundSolrClient createSolrClient() throws E {
-    final LBHttpSolrClient httpSolrClient = setUpHttpSolrConnection();
+    final HttpJdkSolrClient httpSolrClient = setUpHttpSolrConnection();
     final CloudSolrClient cloudSolrClient;
     if (settings.hasZookeeperConnection()) {
       cloudSolrClient = setUpCloudSolrConnection(httpSolrClient);
@@ -51,16 +52,15 @@ public class SolrClientProvider<E extends Exception> {
     return new CompoundSolrClient(httpSolrClient, cloudSolrClient);
   }
 
-  private LBHttpSolrClient setUpHttpSolrConnection() throws E {
-    final String[] solrHosts =
-        settings.getSolrHosts().stream().map(URI::toString).toArray(String[]::new);
+  private HttpJdkSolrClient setUpHttpSolrConnection() throws E {
+    final String[] solrHosts = settings.getSolrHosts().stream().map(URI::toString).toArray(String[]::new);
     if (LOGGER.isInfoEnabled()) {
       LOGGER.info("Connecting to Solr hosts: [{}]", String.join(", ", solrHosts));
     }
-    return new LBHttpSolrClient.Builder().withBaseSolrUrls(solrHosts).build();
+    return new HttpJdkSolrClient.Builder(solrHosts[0]).build();
   }
 
-  private CloudSolrClient setUpCloudSolrConnection(LBHttpSolrClient httpSolrClient) throws E {
+  private CloudSolrClient setUpCloudSolrConnection(HttpJdkSolrClient httpSolrClient) throws E {
 
     // Get information from settings
     final Set<String> hosts = settings.getZookeeperHosts().stream()
@@ -72,7 +72,7 @@ public class SolrClientProvider<E extends Exception> {
     // Configure connection builder
     final CloudSolrClient.Builder builder = new CloudSolrClient.Builder(List.copyOf(hosts),
         Optional.ofNullable(chRoot));
-    builder.withLBHttpSolrClient(httpSolrClient);
+    builder.withHttpClient(httpSolrClient);
 
     // Set up Zookeeper connection
     if (LOGGER.isInfoEnabled()) {
@@ -81,15 +81,20 @@ public class SolrClientProvider<E extends Exception> {
           String.join(", ", hosts), chRoot, defaultCollection,
           connectionTimeoutInSecs == null ? "default" : (connectionTimeoutInSecs + " seconds"));
     }
-    final CloudSolrClient cloudSolrClient = builder.build();
-    cloudSolrClient.setDefaultCollection(defaultCollection);
+    int timeoutInMillis = 5000;
     if (connectionTimeoutInSecs != null) {
-      final int timeoutInMillis = (int) Duration.ofSeconds(connectionTimeoutInSecs).toMillis();
-      cloudSolrClient.setZkConnectTimeout(timeoutInMillis);
-      cloudSolrClient.setZkClientTimeout(timeoutInMillis);
+     timeoutInMillis = (int) Duration.ofSeconds(connectionTimeoutInSecs).toMillis();
     }
-    cloudSolrClient.connect();
+    final CloudSolrClient cloudSolrClient =  builder
+        .withDefaultCollection(defaultCollection)
+        .withZkClientTimeout(timeoutInMillis, TimeUnit.MILLISECONDS)
+        .withZkConnectTimeout(timeoutInMillis, TimeUnit.MILLISECONDS)
+        .build();
 
+    Set<String> nodes = cloudSolrClient.getClusterStateProvider().getLiveNodes();
+    if (LOGGER.isInfoEnabled()) {
+      LOGGER.info("Connected Nodes: [{}]", String.join(", ", nodes));
+    }
     // Done
     return cloudSolrClient;
   }
