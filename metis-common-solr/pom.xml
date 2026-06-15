@@ -36,6 +36,11 @@
     </dependency>
     <dependency>
       <groupId>org.apache.solr</groupId>
+      <artifactId>solr-solrj-jetty</artifactId>
+      <version>${version.solr.solrj}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.solr</groupId>
       <artifactId>solr-solrj-zookeeper</artifactId>
       <version>${version.solr.solrj}</version>
     </dependency>
