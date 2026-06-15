@@ -27,8 +27,6 @@ class SolrClientProviderTest {
     private static final String ZOOKEEPER_CHROOT = "/solr";
     private static final String DEFAULT_COLLECTION = "default_collection";
     private static final int CONNECTION_TIMEOUT_SECS = 30;
-    private static final int DEFAULT_CONNECTION_TIMEOUT = 5000;
-    private static final int DEFAULT_IDLE_CONNECTION_TIMEOUT = 10000;
 
     private SolrProperties<Exception> solrProperties;
     private SolrClientProvider<Exception> solrClientProvider;
