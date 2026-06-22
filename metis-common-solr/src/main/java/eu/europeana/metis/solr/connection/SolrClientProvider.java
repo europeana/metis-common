@@ -25,8 +25,6 @@ import java.util.stream.Collectors;
 public class SolrClientProvider<E extends Exception> {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(SolrClientProvider.class);
-    private static final int DEFAULT_CONNECTION_TIMEOUT = 5000;
-    private static final int DEFAULT_IDLE_CONNECTION_TIMEOUT = 10000;
     private final SolrProperties<E> settings;
 
     /**
@@ -63,9 +61,11 @@ public class SolrClientProvider<E extends Exception> {
             LOGGER.info("Connecting to Solr hosts: [{}]",
                     String.join(", ", Arrays.stream(solrHosts).map(Endpoint::toString).toArray(String[]::new)));
         }
+
         HttpJettySolrClient baseClient = new HttpJettySolrClient.Builder()
-                .withConnectionTimeout(DEFAULT_CONNECTION_TIMEOUT, TimeUnit.MILLISECONDS)
-                .withIdleTimeout(DEFAULT_IDLE_CONNECTION_TIMEOUT, TimeUnit.MILLISECONDS)
+                .withConnectionTimeout(settings.getSolrClientConnectionTimeoutInSecs(), TimeUnit.SECONDS)
+                .withIdleTimeout(settings.getSolrClientIdleConnectionTimeoutInSecs(), TimeUnit.SECONDS)
+                .useHttp1_1(settings.getSolrUseHttp1())
                 .build();
         return new LBJettySolrClient.Builder(baseClient, solrHosts).build();
     }
