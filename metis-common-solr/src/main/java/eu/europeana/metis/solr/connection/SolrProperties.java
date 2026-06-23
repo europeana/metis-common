@@ -19,6 +19,9 @@ public class SolrProperties<E extends Exception> implements DatabaseProperties {
 
   // Default settings
   private static final int DEFAULT_ZOOKEEPER_TIMEOUT_IN_SECONDS = 30;
+  private static final int DEFAULT_SOLR_CONNECTION_TIMEOUT_IN_SECONDS = 5;
+  private static final int DEFAULT_SOLR_IDLE_CONNECTION_TIMEOUT_IN_SECONDS = 10;
+  private static final boolean DEFAULT_SOLR_USE_HTTP_1 = true;
 
   // Exception creator
   private final Function<String, E> exceptionCreator;
@@ -28,6 +31,9 @@ public class SolrProperties<E extends Exception> implements DatabaseProperties {
   private String zookeeperChroot;
   private String zookeeperDefaultCollection;
   private Integer zookeeperTimeoutInSecs = DEFAULT_ZOOKEEPER_TIMEOUT_IN_SECONDS;
+  private Integer solrClientConnectionTimeoutInSecs = DEFAULT_SOLR_CONNECTION_TIMEOUT_IN_SECONDS;
+  private Integer solrClientIdleConnectionTimeoutInSecs = DEFAULT_SOLR_IDLE_CONNECTION_TIMEOUT_IN_SECONDS;
+  private Boolean solrUseHttp1 = DEFAULT_SOLR_USE_HTTP_1;
 
   // Solr settings
   private final List<URI> solrHosts = new ArrayList<>();
@@ -201,5 +207,59 @@ public class SolrProperties<E extends Exception> implements DatabaseProperties {
    */
   public boolean hasZookeeperConnection() {
     return !zookeeperHosts.isEmpty();
+  }
+
+  /**
+   * Gets solr client connection timeout in secs.
+   *
+   * @return the solr client connection timeout in secs
+   */
+  public Integer getSolrClientConnectionTimeoutInSecs() {
+    return this.solrClientConnectionTimeoutInSecs;
+  }
+
+  /**
+   * Gets solr client idle connection timeout in secs.
+   *
+   * @return the solr client idle connection timeout in secs
+   */
+  public Integer getSolrClientIdleConnectionTimeoutInSecs() {
+    return this.solrClientIdleConnectionTimeoutInSecs;
+  }
+
+  /**
+   * Sets solr client connection timeout in secs.
+   *
+   * @param solrClientConnectionTimeoutInSecs the solr client connection timeout in secs
+   */
+  public void setSolrClientConnectionTimeoutInSecs(Integer solrClientConnectionTimeoutInSecs) {
+      this.solrClientConnectionTimeoutInSecs = solrClientConnectionTimeoutInSecs;
+  }
+
+  /**
+   * Sets solr client idle connection timeout in secs.
+   *
+   * @param solrClientIdleConnectionTimeoutInSecs the solr client idle connection timeout in secs
+   */
+  public void setSolrClientIdleConnectionTimeoutInSecs(Integer solrClientIdleConnectionTimeoutInSecs) {
+    this.solrClientIdleConnectionTimeoutInSecs = solrClientIdleConnectionTimeoutInSecs;
+  }
+
+  /**
+   * Gets solr use http 1.
+   *
+   * @return the solr use http 1
+   */
+  public Boolean getSolrUseHttp1() {
+    return solrUseHttp1;
+  }
+
+  /**
+   * Sets solr use http 1.
+   *
+   * @param solrUseHttp1 the solr use http 1
+   */
+  public void setSolrUseHttp1(Boolean solrUseHttp1) {
+    this.solrUseHttp1 = solrUseHttp1;
   }
 }
