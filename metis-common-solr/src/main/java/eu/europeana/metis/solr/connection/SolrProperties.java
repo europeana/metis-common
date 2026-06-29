@@ -33,7 +33,7 @@ public class SolrProperties<E extends Exception> implements DatabaseProperties {
   private Integer zookeeperTimeoutInSecs = DEFAULT_ZOOKEEPER_TIMEOUT_IN_SECONDS;
   private Integer solrClientConnectionTimeoutInSecs = DEFAULT_SOLR_CONNECTION_TIMEOUT_IN_SECONDS;
   private Integer solrClientIdleConnectionTimeoutInSecs = DEFAULT_SOLR_IDLE_CONNECTION_TIMEOUT_IN_SECONDS;
-  private Boolean solrUseHttp1 = DEFAULT_SOLR_USE_HTTP_1;
+  private boolean solrUseHttp1 = DEFAULT_SOLR_USE_HTTP_1;
 
   // Solr settings
   private final List<URI> solrHosts = new ArrayList<>();
@@ -250,7 +250,7 @@ public class SolrProperties<E extends Exception> implements DatabaseProperties {
    *
    * @return the solr use http 1
    */
-  public Boolean getSolrUseHttp1() {
+  public boolean getSolrUseHttp1() {
     return solrUseHttp1;
   }
 
@@ -259,7 +259,7 @@ public class SolrProperties<E extends Exception> implements DatabaseProperties {
    *
    * @param solrUseHttp1 the solr use http 1
    */
-  public void setSolrUseHttp1(Boolean solrUseHttp1) {
+  public void setSolrUseHttp1(boolean solrUseHttp1) {
     this.solrUseHttp1 = solrUseHttp1;
   }
 }

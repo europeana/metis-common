@@ -1,15 +1,14 @@
 package eu.europeana.metis.solr.client;
 
-import org.apache.solr.client.solrj.impl.CloudSolrClient;
-import org.apache.solr.client.solrj.jetty.LBJettySolrClient;
-import org.junit.jupiter.api.Test;
-
-import java.io.IOException;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+
+import java.io.IOException;
+import org.apache.solr.client.solrj.impl.CloudSolrClient;
+import org.apache.solr.client.solrj.impl.HttpJdkSolrClient;
+import org.junit.jupiter.api.Test;
 
 /**
  * Unit test for {@link CompoundSolrClient}
@@ -21,10 +20,10 @@ class CompoundSolrClientTest {
 
     @Test
     void getSolrClient() {
-        final LBJettySolrClient lbHttpSolrClient = mock(LBJettySolrClient.class);
+        final HttpJdkSolrClient httpJdkSolrClient = mock(HttpJdkSolrClient.class);
         final CloudSolrClient cloudSolrClient = mock(CloudSolrClient.class);
 
-        compoundSolrClient = new CompoundSolrClient(lbHttpSolrClient, cloudSolrClient);
+        compoundSolrClient = new CompoundSolrClient(httpJdkSolrClient, cloudSolrClient);
 
         assertNotNull(compoundSolrClient.getSolrClient());
         assertEquals(cloudSolrClient, compoundSolrClient.getSolrClient());
@@ -32,23 +31,23 @@ class CompoundSolrClientTest {
 
     @Test
     void getSolrClientCloudSolrClientIsNull() {
-        final LBJettySolrClient lbHttpSolrClient = mock(LBJettySolrClient.class);
+        final HttpJdkSolrClient httpJdkSolrclient = mock(HttpJdkSolrClient.class);
 
-        compoundSolrClient = new CompoundSolrClient(lbHttpSolrClient, null);
+        compoundSolrClient = new CompoundSolrClient(httpJdkSolrclient, null);
 
         assertNotNull(compoundSolrClient.getSolrClient());
-        assertEquals(lbHttpSolrClient, compoundSolrClient.getSolrClient());
+        assertEquals(httpJdkSolrclient, compoundSolrClient.getSolrClient());
     }
 
     @Test
     void close() throws IOException {
-        final LBJettySolrClient lbHttpSolrClient = mock(LBJettySolrClient.class);
+        final HttpJdkSolrClient httpJdkSolrClient = mock(HttpJdkSolrClient.class);
         final CloudSolrClient cloudSolrClient = mock(CloudSolrClient.class);
-        compoundSolrClient = new CompoundSolrClient(lbHttpSolrClient, cloudSolrClient);
+        compoundSolrClient = new CompoundSolrClient(httpJdkSolrClient, cloudSolrClient);
 
         compoundSolrClient.close();
 
-        verify(lbHttpSolrClient).close();
+        verify(httpJdkSolrClient).close();
         verify(cloudSolrClient).close();
     }
 }
