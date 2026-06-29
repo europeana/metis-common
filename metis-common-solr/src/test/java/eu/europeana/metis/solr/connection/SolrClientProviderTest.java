@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Set;
 import org.apache.solr.client.solrj.impl.CloudHttp2SolrClient;
 import org.apache.solr.client.solrj.impl.ClusterStateProvider;
+import org.apache.solr.client.solrj.impl.HttpJdkSolrClient;
 import org.apache.solr.client.solrj.jetty.LBJettySolrClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -111,7 +112,7 @@ class SolrClientProviderTest {
     when(solrProperties.getSolrHosts()).thenReturn(List.of());
     when(solrProperties.hasZookeeperConnection()).thenReturn(false);
 
-    try (var ignored = mockConstruction(LBJettySolrClient.class)) {
+    try (var ignored = mockConstruction(HttpJdkSolrClient.class)) {
       eu.europeana.metis.solr.client.CompoundSolrClient result = solrClientProvider.createSolrClient();
       assertNotNull(result);
     }

@@ -1,28 +1,26 @@
 package eu.europeana.metis.solr.client;
 
-import org.apache.solr.client.solrj.SolrClient;
-import org.apache.solr.client.solrj.impl.CloudSolrClient;
-import org.apache.solr.client.solrj.jetty.LBJettySolrClient;
-
 import java.io.Closeable;
 import java.io.IOException;
+import org.apache.solr.client.solrj.SolrClient;
+import org.apache.solr.client.solrj.impl.CloudSolrClient;
 
 /**
  * This class represents a Solr client that can internally consist of two (closeable) clients.
  */
 public class CompoundSolrClient implements Closeable {
 
-    private final LBJettySolrClient httpSolrClient;
+    private final SolrClient httpSolrClient;
     private final CloudSolrClient cloudSolrClient;
 
     /**
      * Constructor with solr client parameters
      *
-     * @param httpSolrClient  the load balanced solr client
+     * @param solrClient  the solr client
      * @param cloudSolrClient the cloud solr client
      */
-    public CompoundSolrClient(LBJettySolrClient httpSolrClient, CloudSolrClient cloudSolrClient) {
-        this.httpSolrClient = httpSolrClient;
+    public CompoundSolrClient(SolrClient solrClient, CloudSolrClient cloudSolrClient) {
+        this.httpSolrClient = solrClient;
         this.cloudSolrClient = cloudSolrClient;
     }
 

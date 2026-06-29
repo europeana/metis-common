@@ -1,7 +1,9 @@
 package eu.europeana.metis.solr.connection;
 
 import eu.europeana.metis.solr.client.CompoundSolrClient;
+import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
+import org.apache.solr.client.solrj.impl.HttpJdkSolrClient;
 import org.apache.solr.client.solrj.impl.LBSolrClient.Endpoint;
 import org.apache.solr.client.solrj.jetty.HttpJettySolrClient;
 import org.apache.solr.client.solrj.jetty.LBJettySolrClient;
@@ -44,17 +46,17 @@ public class SolrClientProvider<E extends Exception> {
      * @throws E In case there is a problem with the supplied properties.
      */
     public CompoundSolrClient createSolrClient() throws E {
-        final LBJettySolrClient httpSolrClient = setUpHttpSolrConnection();
+        final SolrClient httpSolrClient = setUpHttpSolrConnection();
         final CloudSolrClient cloudSolrClient;
         if (settings.hasZookeeperConnection()) {
-            cloudSolrClient = setUpCloudSolrConnection();
+            cloudSolrClient = setUpCloudSolrConnection(httpSolrClient);
         } else {
             cloudSolrClient = null;
         }
         return new CompoundSolrClient(httpSolrClient, cloudSolrClient);
     }
 
-    private LBJettySolrClient setUpHttpSolrConnection() throws E {
+    private SolrClient setUpHttpSolrConnection() throws E {
         final Endpoint[] solrHosts =
                 settings.getSolrHosts().stream().map(host -> new Endpoint(host.toString())).toArray(Endpoint[]::new);
         if (LOGGER.isInfoEnabled()) {
@@ -62,15 +64,22 @@ public class SolrClientProvider<E extends Exception> {
                     String.join(", ", Arrays.stream(solrHosts).map(Endpoint::toString).toArray(String[]::new)));
         }
 
-        HttpJettySolrClient baseClient = new HttpJettySolrClient.Builder()
+        if (settings.getSolrUseHttp1()) {
+            return new HttpJdkSolrClient.Builder(solrHosts[0].getBaseUrl())
                 .withConnectionTimeout(settings.getSolrClientConnectionTimeoutInSecs(), TimeUnit.SECONDS)
                 .withIdleTimeout(settings.getSolrClientIdleConnectionTimeoutInSecs(), TimeUnit.SECONDS)
                 .useHttp1_1(settings.getSolrUseHttp1())
                 .build();
-        return new LBJettySolrClient.Builder(baseClient, solrHosts).build();
+        } else {
+            HttpJettySolrClient baseClient = new HttpJettySolrClient.Builder()
+                .withConnectionTimeout(settings.getSolrClientConnectionTimeoutInSecs(), TimeUnit.SECONDS)
+                .withIdleTimeout(settings.getSolrClientIdleConnectionTimeoutInSecs(), TimeUnit.SECONDS)
+                .build();
+            return new LBJettySolrClient.Builder(baseClient, solrHosts).build();
+        }
     }
 
-    private CloudSolrClient setUpCloudSolrConnection() throws E {
+    private CloudSolrClient setUpCloudSolrConnection(SolrClient solrClient) throws E {
 
         // Get information from settings
         final Set<String> hosts = settings.getZookeeperHosts().stream()
@@ -94,6 +103,9 @@ public class SolrClientProvider<E extends Exception> {
             builder.withZkClientTimeout(timeoutInMillis, TimeUnit.MILLISECONDS);
         }
         builder.withDefaultCollection(defaultCollection);
+        if (settings.getSolrUseHttp1()) {
+            builder.withHttpClient((HttpJdkSolrClient)solrClient);
+        }
         final CloudSolrClient cloudSolrClient = builder.build();
 
         Set<String> nodes = cloudSolrClient.getClusterStateProvider().getLiveNodes();
