@@ -152,6 +152,19 @@ class RecordDaoTest {
   }
 
   @Test
+  void getRecordThrowsException() throws EuropeanaException {
+    final RecordDao spyRecordDao = spy(recordDao);
+
+    doThrow(new MongoDBException(ProblemType.MONGO_UNREACHABLE)).when(spyRecordDao).getRecord("");
+    doThrow(new MongoDBException(ProblemType.MONGO_UNREACHABLE)).when(spyRecordDao).getRecords("");
+    doThrow(new MongoDBException(ProblemType.MONGO_UNREACHABLE)).when(spyRecordDao).getRecords(List.of(""));
+
+    assertThrows(EuropeanaException.class, () -> spyRecordDao.getRecord(""));
+    assertThrows(EuropeanaException.class, () -> spyRecordDao.getRecords(""));
+    assertThrows(EuropeanaException.class, () -> spyRecordDao.getRecords(List.of("")));
+  }
+
+  @Test
   void testHasRecord() throws EuropeanaException {
     recordDao.getDatastore().save(getFullBean());
     assertNotNull( recordDao.hasRecord("fullBeanAbout"));
