@@ -1,7 +1,12 @@
 package eu.europeana.metis.mongo.dao;
 
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.spy;
 
@@ -156,11 +161,9 @@ class RecordDaoTest {
     final RecordDao spyRecordDao = spy(recordDao);
 
     doThrow(new MongoDBException(ProblemType.MONGO_UNREACHABLE)).when(spyRecordDao).getRecord("");
-    doThrow(new MongoDBException(ProblemType.MONGO_UNREACHABLE)).when(spyRecordDao).getRecords("");
     doThrow(new MongoDBException(ProblemType.MONGO_UNREACHABLE)).when(spyRecordDao).getRecords(List.of(""));
 
     assertThrows(EuropeanaException.class, () -> spyRecordDao.getRecord(""));
-    assertThrows(EuropeanaException.class, () -> spyRecordDao.getRecords(""));
     assertThrows(EuropeanaException.class, () -> spyRecordDao.getRecords(List.of("")));
   }
 
@@ -182,12 +185,6 @@ class RecordDaoTest {
     beans.forEach(bean -> {
       assertNotNull(bean.getAbout());
         });
-
-    // test another method
-    beans = recordDao.getRecords("fullBeanAbout", "test", "invalid");
-    beans.forEach(bean -> {
-      assertNotNull(bean.getAbout());
-    });
   }
 
 

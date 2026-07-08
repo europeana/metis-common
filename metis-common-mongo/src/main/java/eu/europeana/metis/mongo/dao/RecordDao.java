@@ -45,7 +45,12 @@ import eu.europeana.corelib.solr.entity.WebResourceImpl;
 import eu.europeana.corelib.web.exception.EuropeanaException;
 import eu.europeana.corelib.web.exception.ProblemType;
 
-import java.util.*;
+import java.util.Optional;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 
 import org.slf4j.Logger;
@@ -155,17 +160,6 @@ public class RecordDao {
     } catch (RuntimeException re) {
       throw processException(re);
     }
-  }
-
-  /**
-   * Retrieves a stream of {@link FullBean} objects based on a provided array of unique identifiers.
-   *
-   * @param ids an array of unique identifiers corresponding to the {@code about} field of the records
-   * @return a {@link Stream} of {@link FullBean} objects matching the provided identifiers
-   * @throws EuropeanaException if an error occurs during the retrieval process
-   */
-  public Stream<FullBean> getRecords(String... ids) throws EuropeanaException {
-    return getRecords(Arrays.asList(ids));
   }
 
   /**
