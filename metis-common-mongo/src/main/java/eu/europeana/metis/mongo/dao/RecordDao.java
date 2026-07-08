@@ -5,13 +5,10 @@ import com.mongodb.client.MongoClient;
 import dev.morphia.Datastore;
 import dev.morphia.Morphia;
 import dev.morphia.mapping.Mapper;
-import dev.morphia.mapping.MappingException;
 import dev.morphia.query.FindOptions;
 import dev.morphia.query.filters.Filter;
 import dev.morphia.query.filters.Filters;
 import eu.europeana.corelib.definitions.edm.beans.FullBean;
-import eu.europeana.corelib.edm.exceptions.MongoDBException;
-import eu.europeana.corelib.edm.exceptions.MongoRuntimeException;
 import eu.europeana.corelib.edm.model.metainfo.AudioMetaInfoImpl;
 import eu.europeana.corelib.edm.model.metainfo.ImageMetaInfoImpl;
 import eu.europeana.corelib.edm.model.metainfo.TextMetaInfoImpl;
@@ -42,8 +39,6 @@ import eu.europeana.corelib.solr.entity.QualityAnnotationImpl;
 import eu.europeana.corelib.solr.entity.ServiceImpl;
 import eu.europeana.corelib.solr.entity.TimespanImpl;
 import eu.europeana.corelib.solr.entity.WebResourceImpl;
-import eu.europeana.corelib.web.exception.EuropeanaException;
-import eu.europeana.corelib.web.exception.ProblemType;
 
 import java.util.Optional;
 import java.util.Collection;
@@ -138,9 +133,8 @@ public class RecordDao {
    *
    * @param id the unique identifier of the record, corresponding to the {@code about} field
    * @return an {@link Optional} containing the {@link FullBean} if found, otherwise an empty {@link Optional}
-   * @throws EuropeanaException if an error occurs during the retrieval process
    */
-  public Optional<FullBean> getRecord(String id) throws EuropeanaException {
+  public Optional<FullBean> getRecord(String id) {
     return getRecords(Filters.eq(ABOUT, id), new FindOptions()).findFirst();
   }
 
@@ -149,16 +143,11 @@ public class RecordDao {
    *
    * @param id the unique identifier of the record, corresponding to the {@code about} field
    * @return {@code true} if the record exists, {@code false} otherwise
-   * @throws EuropeanaException if an error occurs during the lookup process
    */
-  public boolean hasRecord(String id) throws EuropeanaException {
-    try {
-      return (getDatastore().find(FullBeanImpl.class)
-              .filter(Filters.eq(ABOUT, id))
-              .count() > 0);
-    } catch (RuntimeException re) {
-      throw processException(re);
-    }
+  public boolean hasRecord(String id) {
+    return (getDatastore().find(FullBeanImpl.class)
+            .filter(Filters.eq(ABOUT, id))
+            .count() > 0);
   }
 
   /**
@@ -166,9 +155,8 @@ public class RecordDao {
    *
    * @param ids a collection of unique identifiers corresponding to the {@code about} field of the records
    * @return a {@link Stream} of {@link FullBean} objects matching the provided identifiers
-   * @throws EuropeanaException if an error occurs during the retrieval process
    */
-  public Stream<FullBean> getRecords(Collection<String> ids) throws EuropeanaException {
+  public Stream<FullBean> getRecords(Collection<String> ids) {
     FindOptions opts = new FindOptions().batchSize(ids.size());
     return getRecords(Filters.in(ABOUT, ids), opts);
   }
@@ -179,15 +167,10 @@ public class RecordDao {
    * @param filter the filter criteria to apply when fetching the records
    * @param opts   the find options specifying how the records should be retrieved, such as sorting and pagination
    * @return a {@link Stream} of {@link FullBean} objects that match the provided filter and find options
-   * @throws EuropeanaException if an error occurs during the retrieval process
    */
-  public Stream<FullBean> getRecords(Filter filter, FindOptions opts) throws EuropeanaException {
-    try {
-      return getDatastore().find(FullBeanImpl.class, opts).filter(filter)
+  public Stream<FullBean> getRecords(Filter filter, FindOptions opts)  {
+    return getDatastore().find(FullBeanImpl.class, opts).filter(filter)
               .stream().map(this::injectWebMeta);
-    } catch (RuntimeException re) {
-      throw processException(re);
-    }
   }
 
   /**
@@ -208,22 +191,17 @@ public class RecordDao {
    *
    * @param id the identifier of the fullbean
    * @return the matched full bean
-   * @throws EuropeanaException if anything when wrong with the request
    */
-  public FullBean getFullBean(String id) throws EuropeanaException {
-    try {
-      long start = 0;
-      if (LOGGER.isDebugEnabled()) {
-        start = System.currentTimeMillis();
-      }
-      FullBeanImpl result = datastore.find(FullBeanImpl.class).filter(Filters.eq(ABOUT, id))
-            .first();
-      LOGGER.debug("Mongo query find fullbean {} finished in {} ms", id,
-          (System.currentTimeMillis() - start));
-      return result;
-    } catch (RuntimeException re) {
-      throw processException(re);
+  public FullBean getFullBean(String id) {
+    long start = 0;
+    if (LOGGER.isDebugEnabled()) {
+      start = System.currentTimeMillis();
     }
+    FullBeanImpl result = datastore.find(FullBeanImpl.class).filter(Filters.eq(ABOUT, id))
+            .first();
+    LOGGER.debug("Mongo query find fullbean {} finished in {} ms", id,
+            (System.currentTimeMillis() - start));
+    return result;
   }
 
   /**
@@ -272,19 +250,4 @@ public class RecordDao {
     return datastore.find(clazz).filter(Filters.eq(ABOUT, about)).first();
   }
 
-  /**
-   * Processes a {@link RuntimeException} and maps it to a specific {@link EuropeanaException}.
-   * Determines the exception type based on the cause and provides an appropriate error context.
-   *
-   * @param re the runtime exception to process
-   * @return a {@link EuropeanaException} instance representing the processed exception
-   */
-  protected EuropeanaException processException(RuntimeException re) {
-    if (re.getCause() != null && (re.getCause() instanceof MappingException
-            || re.getCause() instanceof ClassCastException)) {
-      return new MongoDBException(ProblemType.RECORD_RETRIEVAL_ERROR, re);
-    } else {
-      return new MongoRuntimeException(ProblemType.MONGO_UNREACHABLE, re);
-    }
-  }
 }

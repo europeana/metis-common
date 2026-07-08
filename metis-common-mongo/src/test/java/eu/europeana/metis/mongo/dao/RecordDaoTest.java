@@ -5,21 +5,13 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.spy;
 
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 import dev.morphia.Datastore;
-import dev.morphia.mapping.MappingException;
 import eu.europeana.corelib.definitions.edm.beans.FullBean;
 import eu.europeana.corelib.definitions.edm.model.metainfo.ImageOrientation;
 import eu.europeana.corelib.definitions.edm.model.metainfo.WebResourceMetaInfo;
-import eu.europeana.corelib.edm.exceptions.MongoDBException;
-import eu.europeana.corelib.edm.exceptions.MongoRuntimeException;
 import eu.europeana.corelib.edm.model.metainfo.AudioMetaInfoImpl;
 import eu.europeana.corelib.edm.model.metainfo.ImageMetaInfoImpl;
 import eu.europeana.corelib.edm.model.metainfo.TextMetaInfoImpl;
@@ -42,7 +34,6 @@ import eu.europeana.corelib.solr.entity.ProxyImpl;
 import eu.europeana.corelib.solr.entity.TimespanImpl;
 import eu.europeana.corelib.solr.entity.WebResourceImpl;
 import eu.europeana.corelib.web.exception.EuropeanaException;
-import eu.europeana.corelib.web.exception.ProblemType;
 import eu.europeana.metis.mongo.embedded.EmbeddedLocalhostMongo;
 import java.time.Instant;
 import java.util.Date;
@@ -104,15 +95,6 @@ class RecordDaoTest {
   }
 
   @Test
-  void getFullBeanThrowsException() throws EuropeanaException {
-    final RecordDao spyRecordDao = spy(recordDao);
-
-    doThrow(new MongoDBException(ProblemType.MONGO_UNREACHABLE)).when(spyRecordDao).getFullBean("");
-
-    assertThrows(EuropeanaException.class, () -> spyRecordDao.getFullBean(""));
-  }
-
-  @Test
   void retrieveWebMetaInfosFound() {
     recordDao.getDatastore().save(getWebResourceMetaInfo());
 
@@ -150,7 +132,7 @@ class RecordDaoTest {
   }
 
   @Test
-  void testGetRecord() throws EuropeanaException {
+  void testGetRecord() {
     recordDao.getDatastore().save(getFullBean());
 
     Optional<FullBean> bean = recordDao.getRecord("fullBeanAbout");
@@ -163,18 +145,7 @@ class RecordDaoTest {
   }
 
   @Test
-  void getRecordThrowsException() throws EuropeanaException {
-    final RecordDao spyRecordDao = spy(recordDao);
-
-    doThrow(new MongoDBException(ProblemType.MONGO_UNREACHABLE)).when(spyRecordDao).getRecord("");
-    doThrow(new MongoDBException(ProblemType.MONGO_UNREACHABLE)).when(spyRecordDao).getRecords(List.of(""));
-
-    assertThrows(EuropeanaException.class, () -> spyRecordDao.getRecord(""));
-    assertThrows(EuropeanaException.class, () -> spyRecordDao.getRecords(List.of("")));
-  }
-
-  @Test
-  void testHasRecord() throws EuropeanaException {
+  void testHasRecord() {
     recordDao.getDatastore().save(getFullBean());
     assertTrue(recordDao.hasRecord("fullBeanAbout"));
   }
@@ -192,41 +163,6 @@ class RecordDaoTest {
       assertNotNull(bean.getAbout());
         });
   }
-
-  @Test
-  void shouldReturnMongoDbExceptionWhenCauseIsMappingException() {
-    RuntimeException runtimeException =
-            new RuntimeException(new MappingException("mapping failed"));
-
-    EuropeanaException result = recordDao.processException(runtimeException);
-
-    assertInstanceOf(MongoDBException.class, result);
-    assertEquals(ProblemType.RECORD_RETRIEVAL_ERROR.getErrorCode(), result.getErrorCode());
-  }
-
-  @Test
-  void shouldReturnMongoDbExceptionWhenCauseIsClassCastException() {
-    RuntimeException runtimeException =
-            new RuntimeException(new ClassCastException("bad cast"));
-
-    EuropeanaException result = recordDao.processException(runtimeException);
-
-    assertInstanceOf(MongoDBException.class, result);
-    assertEquals(ProblemType.RECORD_RETRIEVAL_ERROR.getErrorCode(), result.getErrorCode());
-  }
-
-  @Test
-  void shouldReturnMongoRuntimeExceptionWhenCauseIsSomethingElse() {
-    RuntimeException runtimeException =
-            new RuntimeException(new IllegalArgumentException("other"));
-
-    EuropeanaException result = recordDao.processException(runtimeException);
-
-    assertInstanceOf(MongoRuntimeException.class, result);
-    assertEquals(ProblemType.MONGO_UNREACHABLE.getErrorCode(), result.getErrorCode());
-  }
-
-
 
   @Test
   void createIndexes() {
