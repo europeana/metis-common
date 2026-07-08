@@ -191,7 +191,6 @@ public class RecordDao {
   @SuppressWarnings("java:S5738")
   public Stream<FullBean> getRecords(Filter filter, FindOptions opts) throws EuropeanaException {
     try {
-
       return getDatastore().find(FullBeanImpl.class).filter(filter)
               .stream(opts).map(this::injectWebMeta);
     } catch (RuntimeException re) {
@@ -242,6 +241,7 @@ public class RecordDao {
    * @return a map of the web resource metadata id and the metadata corresponding to that id
    */
   public Map<String, WebResourceMetaInfoImpl> retrieveWebMetaInfos(List<String> hashCodes) {
+    System.out.println(hashCodes);
     Map<String, WebResourceMetaInfoImpl> metaInfos = new HashMap<>();
 
     final BasicDBObject basicObject = new BasicDBObject("$in", hashCodes);

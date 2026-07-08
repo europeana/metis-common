@@ -1,11 +1,7 @@
 package eu.europeana.metis.mongo.dao;
 
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.spy;
 
@@ -41,9 +37,9 @@ import eu.europeana.corelib.web.exception.EuropeanaException;
 import eu.europeana.corelib.web.exception.ProblemType;
 import eu.europeana.metis.mongo.embedded.EmbeddedLocalhostMongo;
 import java.time.Instant;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Stream;
+
 import org.bson.types.ObjectId;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -141,6 +137,40 @@ class RecordDaoTest {
     assertNotNull(actualBean);
     assertFullBean(getFullBean(), actualBean);
   }
+
+  @Test
+  void testGetRecord() throws EuropeanaException {
+    recordDao.getDatastore().save(getFullBean());
+
+    Optional<FullBean> bean = recordDao.getRecord("fullBeanAbout");
+
+    assertTrue(bean.isPresent());
+
+    FullBean actualBean = bean.get();
+    assertNotNull(actualBean);
+    assertFullBean(getFullBean(), actualBean);
+  }
+
+  @Test
+  void testHasRecord() throws EuropeanaException {
+    recordDao.getDatastore().save(getFullBean());
+    assertNotNull( recordDao.hasRecord("fullBeanAbout"));
+  }
+
+  @Test
+  void testHasRecordNotFound() throws EuropeanaException {
+    assertFalse(recordDao.hasRecord("test_invalid_id"));
+  }
+
+  @Test
+  void testGetMultipleRecords() throws EuropeanaException {
+    recordDao.getDatastore().save(getFullBean());
+    Stream<FullBean> beans = recordDao.getRecords(List.of("fullBeanAbout", "test", "invalid"));
+    beans.forEach(bean -> {
+      assertNotNull(bean.getAbout());
+        });
+  }
+
 
   @Test
   void createIndexes() {
