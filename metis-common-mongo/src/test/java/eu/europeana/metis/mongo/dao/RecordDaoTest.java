@@ -170,7 +170,7 @@ class RecordDaoTest {
   @Test
   void testHasRecord() throws EuropeanaException {
     recordDao.getDatastore().save(getFullBean());
-    assertNotNull( recordDao.hasRecord("fullBeanAbout"));
+    assertTrue(recordDao.hasRecord("fullBeanAbout"));
   }
 
   @Test
