@@ -25,16 +25,7 @@
       <version>${project.version}</version>
     </dependency>
     <!-- This dependency is a temporary one, until the morphia classes are moved to metis -->
-    <dependency>
-      <groupId>eu.europeana.corelib</groupId>
-      <artifactId>corelib-storage</artifactId>
-      <exclusions>
-        <exclusion>
-          <groupId>com.fasterxml.jackson.module</groupId>
-          <artifactId>jackson-module-jaxb-annotations</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
+    <!-- have removed corelib-storage as it is already included in corelib-record  -->
     <dependency>
       <groupId>eu.europeana.corelib</groupId>
       <artifactId>corelib-record</artifactId>
@@ -43,6 +34,30 @@
         <exclusion>
           <groupId>com.fasterxml.jackson.module</groupId>
           <artifactId>jackson-module-jaxb-annotations</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.logging.log4j</groupId>
+          <artifactId>log4j-core</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.logging.log4j</groupId>
+          <artifactId>log4j-slf4j2-impl</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.logging.log4j</groupId>
+          <artifactId>log4j-api</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.fasterxml.jackson.core</groupId>
+          <artifactId>jackson-annotations</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>eu.europeana.metis</groupId>
+          <artifactId>metis-schema</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.mockito</groupId>
+          <artifactId>mockito-core</artifactId>
         </exclusion>
       </exclusions>
     </dependency>
