@@ -33,7 +33,6 @@ import eu.europeana.corelib.solr.entity.ProvidedCHOImpl;
 import eu.europeana.corelib.solr.entity.ProxyImpl;
 import eu.europeana.corelib.solr.entity.TimespanImpl;
 import eu.europeana.corelib.solr.entity.WebResourceImpl;
-import eu.europeana.corelib.web.exception.EuropeanaException;
 import eu.europeana.metis.mongo.embedded.EmbeddedLocalhostMongo;
 import java.time.Instant;
 import java.util.Date;
@@ -85,7 +84,7 @@ class RecordDaoTest {
   }
 
   @Test
-  void getFullBeanHappyPath() throws EuropeanaException {
+  void getFullBeanHappyPath() {
     recordDao.getDatastore().save(getFullBean());
 
     final FullBean actualBean = recordDao.getFullBean("fullBeanAbout");
@@ -151,12 +150,12 @@ class RecordDaoTest {
   }
 
   @Test
-  void testHasRecordNotFound() throws EuropeanaException {
+  void testHasRecordNotFound() {
     assertFalse(recordDao.hasRecord("test_invalid_id"));
   }
 
   @Test
-  void testGetMultipleRecords() throws EuropeanaException {
+  void testGetMultipleRecords() {
     recordDao.getDatastore().save(getFullBean());
     Stream<FullBean> beans = recordDao.getRecords(List.of("fullBeanAbout", "test", "invalid"));
     beans.forEach(bean -> {
