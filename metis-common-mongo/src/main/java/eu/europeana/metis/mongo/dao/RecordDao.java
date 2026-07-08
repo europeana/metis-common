@@ -181,11 +181,10 @@ public class RecordDao {
    * @return a {@link Stream} of {@link FullBean} objects that match the provided filter and find options
    * @throws EuropeanaException if an error occurs during the retrieval process
    */
-  @SuppressWarnings("java:S5738")
   public Stream<FullBean> getRecords(Filter filter, FindOptions opts) throws EuropeanaException {
     try {
-      return getDatastore().find(FullBeanImpl.class).filter(filter)
-              .stream(opts).map(this::injectWebMeta);
+      return getDatastore().find(FullBeanImpl.class, opts).filter(filter)
+              .stream().map(this::injectWebMeta);
     } catch (RuntimeException re) {
       throw processException(re);
     }
