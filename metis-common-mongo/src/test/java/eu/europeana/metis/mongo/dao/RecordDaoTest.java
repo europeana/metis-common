@@ -1,13 +1,10 @@
 package eu.europeana.metis.mongo.dao;
 
-
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.spy;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
@@ -15,7 +12,6 @@ import dev.morphia.Datastore;
 import eu.europeana.corelib.definitions.edm.beans.FullBean;
 import eu.europeana.corelib.definitions.edm.model.metainfo.ImageOrientation;
 import eu.europeana.corelib.definitions.edm.model.metainfo.WebResourceMetaInfo;
-import eu.europeana.corelib.edm.exceptions.MongoDBException;
 import eu.europeana.corelib.edm.model.metainfo.AudioMetaInfoImpl;
 import eu.europeana.corelib.edm.model.metainfo.ImageMetaInfoImpl;
 import eu.europeana.corelib.edm.model.metainfo.TextMetaInfoImpl;
@@ -37,13 +33,14 @@ import eu.europeana.corelib.solr.entity.ProvidedCHOImpl;
 import eu.europeana.corelib.solr.entity.ProxyImpl;
 import eu.europeana.corelib.solr.entity.TimespanImpl;
 import eu.europeana.corelib.solr.entity.WebResourceImpl;
-import eu.europeana.corelib.web.exception.EuropeanaException;
-import eu.europeana.corelib.web.exception.ProblemType;
 import eu.europeana.metis.mongo.embedded.EmbeddedLocalhostMongo;
 import java.time.Instant;
 import java.util.Date;
+import java.util.Optional;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
+
 import org.bson.types.ObjectId;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -87,22 +84,13 @@ class RecordDaoTest {
   }
 
   @Test
-  void getFullBeanHappyPath() throws EuropeanaException {
+  void getFullBeanHappyPath() {
     recordDao.getDatastore().save(getFullBean());
 
     final FullBean actualBean = recordDao.getFullBean("fullBeanAbout");
 
     assertNotNull(actualBean);
     assertFullBean(getFullBean(), actualBean);
-  }
-
-  @Test
-  void getFullBeanThrowsException() throws EuropeanaException {
-    final RecordDao spyRecordDao = spy(recordDao);
-
-    doThrow(new MongoDBException(ProblemType.MONGO_UNREACHABLE)).when(spyRecordDao).getFullBean("");
-
-    assertThrows(EuropeanaException.class, () -> spyRecordDao.getFullBean(""));
   }
 
   @Test
@@ -140,6 +128,39 @@ class RecordDaoTest {
 
     assertNotNull(actualBean);
     assertFullBean(getFullBean(), actualBean);
+  }
+
+  @Test
+  void testGetRecord() {
+    recordDao.getDatastore().save(getFullBean());
+
+    Optional<FullBean> bean = recordDao.getRecord("fullBeanAbout");
+
+    assertTrue(bean.isPresent());
+
+    FullBean actualBean = bean.get();
+    assertNotNull(actualBean);
+    assertFullBean(getFullBean(), actualBean);
+  }
+
+  @Test
+  void testHasRecord() {
+    recordDao.getDatastore().save(getFullBean());
+    assertTrue(recordDao.hasRecord("fullBeanAbout"));
+  }
+
+  @Test
+  void testHasRecordNotFound() {
+    assertFalse(recordDao.hasRecord("test_invalid_id"));
+  }
+
+  @Test
+  void testGetMultipleRecords() {
+    recordDao.getDatastore().save(getFullBean());
+    Stream<FullBean> beans = recordDao.getRecords(List.of("fullBeanAbout", "test", "invalid"));
+    beans.forEach(bean -> {
+      assertNotNull(bean.getAbout());
+        });
   }
 
   @Test
