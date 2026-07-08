@@ -57,6 +57,7 @@ import org.slf4j.LoggerFactory;
 public class RecordDao {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(RecordDao.class);
+  private static final String ABOUT  = "about";
   private final Datastore datastore;
 
   /**
@@ -136,7 +137,7 @@ public class RecordDao {
    * @throws EuropeanaException if an error occurs during the retrieval process
    */
   public Optional<FullBean> getRecord(String id) throws EuropeanaException {
-    return getRecords(Filters.eq("about", id), new FindOptions()).findFirst();
+    return getRecords(Filters.eq(ABOUT, id), new FindOptions()).findFirst();
   }
 
   /**
@@ -149,11 +150,11 @@ public class RecordDao {
   public boolean hasRecord(String id) throws EuropeanaException {
     try {
       return (getDatastore().find(FullBeanImpl.class)
-              .filter(Filters.eq("about", id))
+              .filter(Filters.eq(ABOUT, id))
               .count() > 0);
+    } catch (RuntimeException re) {
+      throw processException(re);
     }
-    catch (RuntimeException re) {
-      throw processException(re); }
   }
 
   /**
@@ -176,7 +177,7 @@ public class RecordDao {
    */
   public Stream<FullBean> getRecords(Collection<String> ids) throws EuropeanaException {
     FindOptions opts = new FindOptions().batchSize(ids.size());
-    return getRecords(Filters.in("about", ids), opts);
+    return getRecords(Filters.in(ABOUT, ids), opts);
   }
 
   /**
@@ -187,13 +188,13 @@ public class RecordDao {
    * @return a {@link Stream} of {@link FullBean} objects that match the provided filter and find options
    * @throws EuropeanaException if an error occurs during the retrieval process
    */
+  @SuppressWarnings("java:S5738")
   public Stream<FullBean> getRecords(Filter filter, FindOptions opts) throws EuropeanaException {
     try {
 
       return getDatastore().find(FullBeanImpl.class).filter(filter)
-              .stream(opts).map(r -> injectWebMeta(r) );
-    }
-    catch (RuntimeException re) {
+              .stream(opts).map(this::injectWebMeta);
+    } catch (RuntimeException re) {
       throw processException(re);
     }
   }
@@ -224,7 +225,7 @@ public class RecordDao {
       if (LOGGER.isDebugEnabled()) {
         start = System.currentTimeMillis();
       }
-      FullBeanImpl result = datastore.find(FullBeanImpl.class).filter(Filters.eq("about", id))
+      FullBeanImpl result = datastore.find(FullBeanImpl.class).filter(Filters.eq(ABOUT, id))
             .first();
       LOGGER.debug("Mongo query find fullbean {} finished in {} ms", id,
           (System.currentTimeMillis() - start));
@@ -277,7 +278,7 @@ public class RecordDao {
    * @return the object found
    */
   public <T> T searchByAbout(Class<T> clazz, String about) {
-    return datastore.find(clazz).filter(Filters.eq("about", about)).first();
+    return datastore.find(clazz).filter(Filters.eq(ABOUT, about)).first();
   }
 
   /**
