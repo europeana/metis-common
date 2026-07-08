@@ -241,7 +241,6 @@ public class RecordDao {
    * @return a map of the web resource metadata id and the metadata corresponding to that id
    */
   public Map<String, WebResourceMetaInfoImpl> retrieveWebMetaInfos(List<String> hashCodes) {
-    System.out.println(hashCodes);
     Map<String, WebResourceMetaInfoImpl> metaInfos = new HashMap<>();
 
     final BasicDBObject basicObject = new BasicDBObject("$in", hashCodes);

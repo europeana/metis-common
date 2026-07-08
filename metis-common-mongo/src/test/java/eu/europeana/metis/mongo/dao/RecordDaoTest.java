@@ -169,6 +169,12 @@ class RecordDaoTest {
     beans.forEach(bean -> {
       assertNotNull(bean.getAbout());
         });
+
+    // test another method
+    beans = recordDao.getRecords("fullBeanAbout", "test", "invalid");
+    beans.forEach(bean -> {
+      assertNotNull(bean.getAbout());
+    });
   }
 
 
