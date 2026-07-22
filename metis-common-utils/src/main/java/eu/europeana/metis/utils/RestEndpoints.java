@@ -60,10 +60,10 @@ public final class RestEndpoints {
   public static final String ORCHESTRATOR_WORKFLOWS_EXECUTIONS = "/orchestrator/workflows/executions";
   public static final String ORCHESTRATOR_WORKFLOWS_EXECUTIONS_OVERVIEW = "/orchestrator/workflows/executions/overview";
   public static final String ORCHESTRATOR_WORKFLOWS_EVOLUTION = "/orchestrator/workflows/evolution/{workflowExecutionId}/{pluginType}";
-  public static final String ORCHESTRATOR_PROXIES_TOPOLOGY_TASK_REPORT = "/orchestrator/proxies/{topologyName}/task/{externalTaskId}/report";
-  public static final String ORCHESTRATOR_PROXIES_TOPOLOGY_TASK_REPORT_EXISTS = "/orchestrator/proxies/{topologyName}/task/{externalTaskId}/report/exists";
-  public static final String ORCHESTRATOR_PROXIES_TOPOLOGY_TASK_STATISTICS = "/orchestrator/proxies/{topologyName}/task/{externalTaskId}/statistics";
-  public static final String ORCHESTRATOR_PROXIES_TOPOLOGY_TASK_NODE_STATISTICS = "/orchestrator/proxies/{topologyName}/task/{externalTaskId}/nodestatistics";
+  public static final String ORCHESTRATOR_PROXIES_TOPOLOGY_TASK_REPORT = "/orchestrator/proxies/{topologyName}/task/{engineTaskId}/report";
+  public static final String ORCHESTRATOR_PROXIES_TOPOLOGY_TASK_REPORT_EXISTS = "/orchestrator/proxies/{topologyName}/task/{engineTaskId}/report/exists";
+  public static final String ORCHESTRATOR_PROXIES_TOPOLOGY_TASK_STATISTICS = "/orchestrator/proxies/{topologyName}/task/{engineTaskId}/statistics";
+  public static final String ORCHESTRATOR_PROXIES_TOPOLOGY_TASK_NODE_STATISTICS = "/orchestrator/proxies/{topologyName}/task/{engineTaskId}/nodestatistics";
   public static final String ORCHESTRATOR_PROXIES_RECORDS = "/orchestrator/proxies/records";
   public static final String ORCHESTRATOR_PROXIES_RECORDS_BY_IDS = "/orchestrator/proxies/recordsbyids";
   public static final String ORCHESTRATOR_PROXIES_RECORD_SEARCH_BY_ID = "/orchestrator/proxies/recordsearchbyid";
