@@ -24,4 +24,20 @@ class RdfBaseUrlUtilsTest {
         RdfBaseUrlUtils.undoResolutionAgainstDefaultBaseUrl("http://example.com/A/B"));
     assertNull(RdfBaseUrlUtils.undoResolutionAgainstDefaultBaseUrl(null));
   }
+
+  @Test
+  void replaceDefaultBaseUrlTest() throws URISyntaxException {
+    final URI defaultBaseUrl = new URI(RdfBaseUrlUtils.DEFAULT_BASE_URL);
+    final URI newDefaultUrl = new URI("http://a.com/path/");
+    assertEquals("http://a.com/path/A", RdfBaseUrlUtils.replaceDefaultBaseUrl(
+        defaultBaseUrl.resolve("A").toString(), newDefaultUrl));
+    assertEquals("http://a.com/path/#A", RdfBaseUrlUtils.replaceDefaultBaseUrl(
+        defaultBaseUrl.resolve("#A").toString(), newDefaultUrl));
+    assertEquals("http://a.com/path/A/B", RdfBaseUrlUtils.replaceDefaultBaseUrl(
+        defaultBaseUrl.resolve("A/B").toString(), newDefaultUrl));
+    assertEquals("http://a.com/A/B", RdfBaseUrlUtils.replaceDefaultBaseUrl(
+        defaultBaseUrl.resolve("/A/B").toString(), newDefaultUrl));
+    assertNull(RdfBaseUrlUtils.replaceDefaultBaseUrl("http://example.com/A/B", newDefaultUrl));
+    assertNull(RdfBaseUrlUtils.replaceDefaultBaseUrl((String) null, newDefaultUrl));
+  }
 }
