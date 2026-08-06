@@ -36,8 +36,8 @@
     <version.maven.release.plugin>2.5.3</version.maven.release.plugin>
 
     <!--Internal-->
-    <version.metis-schema>14</version.metis-schema>
-    <version.corelib>2.17.8-SNAPSHOT</version.corelib>
+    <version.metis-schema>15-SNAPSHOT</version.metis-schema>
+    <version.corelib>2.18.0</version.corelib>
 
     <!--External-->
     <version.spring.boot>4.0.1</version.spring.boot>
