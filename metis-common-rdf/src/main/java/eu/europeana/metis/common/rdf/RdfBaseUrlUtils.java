@@ -1,5 +1,9 @@
 package eu.europeana.metis.common.rdf;
 
+import java.net.URI;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.RDFNode;
@@ -68,12 +72,33 @@ public final class RdfBaseUrlUtils {
   }
 
   /**
-   * Detects whether {@link #DEFAULT_BASE_URL} occurs anywhere in the model. This is the same as
-   * checking whether there are any subjects or objects in the model that are relative to the base
-   * URL. Note that properties need to be defined fully and cannot have been relative URIs.
+   * Checks whether the url is relative to the default base URL. This is the same as checking
+   * whether the url starts with {@link #DEFAULT_BASE_DOMAIN}.
+   *
+   * @param url The url to check. Cannot be <code>null</code>.
+   * @return Whether the base URL is
+   */
+  public static boolean isRelativeToDefaultBaseUrl(String url) {
+    return url.startsWith(DEFAULT_BASE_DOMAIN);
+  }
+
+  /**
+   * Checks whether the RDF node is (i.e., has an ID that is) relative to the default base URL.
+   *
+   * @param node The node to check.
+   * @return Whether the node is relative to the default url.
+   */
+  public static boolean containsDefaultBaseUrl(RDFNode node) {
+    return anyResourceHasIdRelativeToBaseUrl(Stream.of(node));
+  }
+
+  /**
+   * Checks whether any resource in the model is (i.e., has an ID that is) relative to the
+   * default base URL. Note that we check all subjects and resource referencing objects. We do not
+   * look at literals. Also, the property itself could never have been a relative URL.
    *
    * @param model The model to check.
-   * @return Whether the default base url is used.
+   * @return Whether any resource in the model is relative to the default url.
    */
   public static boolean containsDefaultBaseUrl(Model model) {
     return anyResourceHasIdRelativeToBaseUrl(model.listSubjects()) ||
@@ -93,12 +118,63 @@ public final class RdfBaseUrlUtils {
       ExtendedIterator<T> nodes) {
     try {
       final Iterable<T> iterable = () -> nodes;
-      return StreamSupport.stream(iterable.spliterator(), false)
-          .filter(RDFNode::isResource).map(RDFNode::asResource)
-          .filter(resource -> !resource.isAnon())
-          .map(Resource::getURI).anyMatch(id -> id.startsWith(DEFAULT_BASE_DOMAIN));
+      return anyResourceHasIdRelativeToBaseUrl(StreamSupport.stream(iterable.spliterator(), false));
     } finally {
       nodes.close();
     }
+  }
+
+  /**
+   * Returns whether any of the nodes has an ID (URI) relative to the base URL. We in fact check
+   * against the base domain, as a relative URL starting with '/' will not contain the path
+   * component of {@link #DEFAULT_BASE_URL}.
+   *
+   * @param nodes Stream with nodes to check.
+   * @param <T>   The type of the nodes in the stream.
+   * @return Whether any of them have an ID relative to the base URL.
+   */
+  private static <T extends RDFNode> boolean anyResourceHasIdRelativeToBaseUrl(Stream<T> nodes) {
+    return nodes.map(RdfBaseUrlUtils::toUri).filter(Objects::nonNull)
+        .anyMatch(RdfBaseUrlUtils::isRelativeToDefaultBaseUrl);
+  }
+
+  /**
+   * Convert an RDF node to a resource identifier if the node represents a non-anonymous resource
+   * that is relative.
+   *
+   * @param node The node to convert.
+   * @return The resource identifier, or null if the node is not a non-anonymous resource.
+   */
+  private static String toUri(RDFNode node) {
+    return Optional.of(node).filter(RDFNode::isResource).map(RDFNode::asResource)
+        .filter(resource -> !resource.isAnon()).map(Resource::getURI).orElse(null);
+  }
+
+  /**
+   * Replace the default base URL with a new base URL. Returns null if the given URI is not relative
+   * to the default base URL.
+   *
+   * @param uri        The URI to convert. Can be null (in which case null is returned).
+   * @param newBaseUrl The new base URL. Must be an absolute non-null URI.
+   * @return The new resource identifier, or null if the node required no changes.
+   */
+  public static String replaceDefaultBaseUrl(String uri, URI newBaseUrl) {
+    return Optional.ofNullable(uri)
+        .filter(RdfBaseUrlUtils::isRelativeToDefaultBaseUrl)
+        .map(RdfBaseUrlUtils::undoResolutionAgainstDefaultBaseUrl)
+        .map(newBaseUrl::resolve).map(URI::toString).orElse(null);
+  }
+
+  /**
+   * Replace the default base URL with a new base URL. Returns null if the node does not need
+   * adjustments. Specifically, if the node is not a non-anonymous resource, or if the identifier is
+   * not relative to the default base URL, we return null.
+   *
+   * @param node       The node to convert.
+   * @param newBaseUrl The new base URL. Must be an absolute non-null URI.
+   * @return The new resource identifier, or null if the node required no changes.
+   */
+  public static String replaceDefaultBaseUrl(RDFNode node, URI newBaseUrl) {
+    return replaceDefaultBaseUrl(toUri(node), newBaseUrl);
   }
 }
