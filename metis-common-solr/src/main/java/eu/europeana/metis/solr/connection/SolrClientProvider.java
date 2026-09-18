@@ -1,6 +1,9 @@
 package eu.europeana.metis.solr.connection;
 
 import eu.europeana.metis.solr.client.CompoundSolrClient;
+import java.io.Closeable;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.client.solrj.impl.HttpJdkSolrClient;
@@ -26,106 +29,145 @@ import java.util.stream.Collectors;
  */
 public class SolrClientProvider<E extends Exception> {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(SolrClientProvider.class);
-    private final SolrProperties<E> settings;
+  private static final Logger LOGGER = LoggerFactory.getLogger(SolrClientProvider.class);
+  private final SolrProperties<E> settings;
 
-    /**
-     * Constructor.
-     *
-     * @param properties The properties of the Mongo connection.
-     */
-    public SolrClientProvider(SolrProperties<E> properties) {
-        this.settings = properties;
+  /**
+   * Constructor.
+   *
+   * @param properties The properties of the Mongo connection.
+   */
+  public SolrClientProvider(SolrProperties<E> properties) {
+    this.settings = properties;
+  }
+
+  /**
+   * Creates a Solr client from the properties. This method can be called multiple times and will return a different client each
+   * time.
+   *
+   * @return A Solr client.
+   * @throws E In case there is a problem with the supplied properties.
+   */
+  public CompoundSolrClient createSolrClient() throws E {
+    final HttpConnection connection = setUpHttpSolrConnection();
+    try (ClientCleanup cleanup = new ClientCleanup(
+        new CompoundSolrClient(connection.client(), null, connection.transport()))) {
+      final CloudSolrClient cloudSolrClient = settings.hasZookeeperConnection()
+          ? setUpCloudSolrConnection(connection.client()) : null;
+      final CompoundSolrClient result =
+          new CompoundSolrClient(connection.client(), cloudSolrClient, connection.transport());
+      cleanup.transferOwnership();
+      return result;
+    }
+  }
+
+  private record HttpConnection(SolrClient client, HttpJettySolrClient transport) {
+
+  }
+
+  private HttpConnection setUpHttpSolrConnection() throws E {
+    final Endpoint[] solrHosts =
+        settings.getSolrHosts().stream().map(host -> new Endpoint(host.toString())).toArray(Endpoint[]::new);
+    if (LOGGER.isInfoEnabled()) {
+      LOGGER.info("Connecting to Solr hosts: [{}]",
+          String.join(", ", Arrays.stream(solrHosts).map(Endpoint::toString).toArray(String[]::new)));
     }
 
-    /**
-     * Creates a Solr client from the properties. This method can be called multiple times and will
-     * return a different client each time.
-     *
-     * @return A Solr client.
-     * @throws E In case there is a problem with the supplied properties.
-     */
-    public CompoundSolrClient createSolrClient() throws E {
-        final SolrClient httpSolrClient = setUpHttpSolrConnection();
-        final CloudSolrClient cloudSolrClient;
-        if (settings.hasZookeeperConnection()) {
-            cloudSolrClient = setUpCloudSolrConnection(httpSolrClient);
-        } else {
-            cloudSolrClient = null;
-        }
-        return new CompoundSolrClient(httpSolrClient, cloudSolrClient);
+    if (settings.getSolrUseHttp1()) {
+      return new HttpConnection(new HttpJdkSolrClient.Builder(solrHosts[0].getBaseUrl())
+          .withConnectionTimeout(settings.getSolrClientConnectionTimeoutInSecs(), TimeUnit.SECONDS)
+          .withIdleTimeout(settings.getSolrClientIdleConnectionTimeoutInSecs(), TimeUnit.SECONDS)
+          .useHttp1_1(settings.getSolrUseHttp1())
+          .build(), null);
+    } else {
+      HttpJettySolrClient baseClient = new HttpJettySolrClient.Builder()
+          .withConnectionTimeout(settings.getSolrClientConnectionTimeoutInSecs(), TimeUnit.SECONDS)
+          .withIdleTimeout(settings.getSolrClientIdleConnectionTimeoutInSecs(), TimeUnit.SECONDS)
+          .build();
+      try (ClientCleanup clientCleanup = new ClientCleanup(baseClient)) {
+        final HttpConnection connection =
+            new HttpConnection(new LBJettySolrClient.Builder(baseClient, solrHosts).build(), baseClient);
+        clientCleanup.transferOwnership();
+        return connection;
+      }
+    }
+  }
+
+  private CloudSolrClient setUpCloudSolrConnection(SolrClient solrClient) throws E {
+
+    // Get information from settings
+    final Set<String> hosts = settings.getZookeeperHosts().stream()
+                                      .map(SolrClientProvider::toCloudSolrClientAddressString).collect(Collectors.toSet());
+    final String chRoot = settings.getZookeeperChroot();
+    final String defaultCollection = settings.getZookeeperDefaultCollection();
+    final Integer connectionTimeoutInSecs = settings.getZookeeperTimeoutInSecs();
+
+    // Configure connection builder
+    final CloudSolrClient.Builder builder = new CloudSolrClient.Builder(List.copyOf(hosts), Optional.ofNullable(chRoot));
+    // Set up Zookeeper connection
+    if (LOGGER.isInfoEnabled()) {
+      LOGGER.info(
+          "Connecting to Zookeeper hosts: [{}] with chRoot [{}] and default connection [{}]. Connection time-out: {}.",
+          String.join(", ", hosts), chRoot, defaultCollection,
+          connectionTimeoutInSecs == null ? "default" : (connectionTimeoutInSecs + " seconds"));
+    }
+    if (connectionTimeoutInSecs != null) {
+      final int timeoutInMillis = (int) Duration.ofSeconds(connectionTimeoutInSecs).toMillis();
+      builder.withZkConnectTimeout(timeoutInMillis, TimeUnit.MILLISECONDS);
+      builder.withZkClientTimeout(timeoutInMillis, TimeUnit.MILLISECONDS);
+    }
+    builder.withDefaultCollection(defaultCollection);
+    if (settings.getSolrUseHttp1()) {
+      builder.withHttpClient((HttpJdkSolrClient) solrClient);
+    }
+    final CloudSolrClient cloudSolrClient = builder.build();
+
+    try (ClientCleanup clientCleanup = new ClientCleanup(cloudSolrClient)) {
+      Set<String> nodes = cloudSolrClient.getClusterStateProvider().getLiveNodes();
+      if (LOGGER.isInfoEnabled()) {
+        LOGGER.info("Connected Nodes: [{}]", String.join(", ", nodes));
+      }
+      clientCleanup.transferOwnership();
+      return cloudSolrClient;
+    }
+  }
+
+  /**
+   * Owns a client during initialization, until ownership passes to the caller.
+   */
+  private static final class ClientCleanup implements AutoCloseable {
+
+    private final Closeable client;
+    private boolean ownershipTransferred;
+
+    private ClientCleanup(Closeable client) {
+      this.client = client;
     }
 
-    private SolrClient setUpHttpSolrConnection() throws E {
-        final Endpoint[] solrHosts =
-                settings.getSolrHosts().stream().map(host -> new Endpoint(host.toString())).toArray(Endpoint[]::new);
-        if (LOGGER.isInfoEnabled()) {
-            LOGGER.info("Connecting to Solr hosts: [{}]",
-                    String.join(", ", Arrays.stream(solrHosts).map(Endpoint::toString).toArray(String[]::new)));
-        }
-
-        if (settings.getSolrUseHttp1()) {
-            return new HttpJdkSolrClient.Builder(solrHosts[0].getBaseUrl())
-                .withConnectionTimeout(settings.getSolrClientConnectionTimeoutInSecs(), TimeUnit.SECONDS)
-                .withIdleTimeout(settings.getSolrClientIdleConnectionTimeoutInSecs(), TimeUnit.SECONDS)
-                .useHttp1_1(settings.getSolrUseHttp1())
-                .build();
-        } else {
-            HttpJettySolrClient baseClient = new HttpJettySolrClient.Builder()
-                .withConnectionTimeout(settings.getSolrClientConnectionTimeoutInSecs(), TimeUnit.SECONDS)
-                .withIdleTimeout(settings.getSolrClientIdleConnectionTimeoutInSecs(), TimeUnit.SECONDS)
-                .build();
-            return new LBJettySolrClient.Builder(baseClient, solrHosts).build();
-        }
+    private void transferOwnership() {
+      ownershipTransferred = true;
     }
 
-    private CloudSolrClient setUpCloudSolrConnection(SolrClient solrClient) throws E {
-
-        // Get information from settings
-        final Set<String> hosts = settings.getZookeeperHosts().stream()
-                .map(SolrClientProvider::toCloudSolrClientAddressString).collect(Collectors.toSet());
-        final String chRoot = settings.getZookeeperChroot();
-        final String defaultCollection = settings.getZookeeperDefaultCollection();
-        final Integer connectionTimeoutInSecs = settings.getZookeeperTimeoutInSecs();
-
-        // Configure connection builder
-        final CloudSolrClient.Builder builder = new CloudSolrClient.Builder(List.copyOf(hosts), Optional.ofNullable(chRoot));
-        // Set up Zookeeper connection
-        if (LOGGER.isInfoEnabled()) {
-            LOGGER.info(
-                    "Connecting to Zookeeper hosts: [{}] with chRoot [{}] and default connection [{}]. Connection time-out: {}.",
-                    String.join(", ", hosts), chRoot, defaultCollection,
-                    connectionTimeoutInSecs == null ? "default" : (connectionTimeoutInSecs + " seconds"));
+    @Override
+    public void close() {
+      if (!ownershipTransferred) {
+        try {
+          client.close();
+        } catch (IOException closeFailure) {
+          throw new UncheckedIOException("Failed to close Solr client during initialization", closeFailure);
         }
-        if (connectionTimeoutInSecs != null) {
-            final int timeoutInMillis = (int) Duration.ofSeconds(connectionTimeoutInSecs).toMillis();
-            builder.withZkConnectTimeout(timeoutInMillis, TimeUnit.MILLISECONDS);
-            builder.withZkClientTimeout(timeoutInMillis, TimeUnit.MILLISECONDS);
-        }
-        builder.withDefaultCollection(defaultCollection);
-        if (settings.getSolrUseHttp1()) {
-            builder.withHttpClient((HttpJdkSolrClient)solrClient);
-        }
-        final CloudSolrClient cloudSolrClient = builder.build();
-
-        Set<String> nodes = cloudSolrClient.getClusterStateProvider().getLiveNodes();
-        if (LOGGER.isInfoEnabled()) {
-            LOGGER.info("Connected Nodes: [{}]", String.join(", ", nodes));
-        }
-
-        // Done
-        return cloudSolrClient;
+      }
     }
+  }
 
-    /**
-     * This utility method converts an address (host plus port) to a string that is accepted by {@link
-     * CloudSolrClient}.
-     *
-     * @param address The address to convert.
-     * @return The compliant string.
-     */
-    static String toCloudSolrClientAddressString(InetSocketAddress address) {
-        return address.getHostString() + ":" + address.getPort();
-    }
+  /**
+   * This utility method converts an address (host plus port) to a string that is accepted by {@link CloudSolrClient}.
+   *
+   * @param address The address to convert.
+   * @return The compliant string.
+   */
+  static String toCloudSolrClientAddressString(InetSocketAddress address) {
+    return address.getHostString() + ":" + address.getPort();
+  }
 }
 
