@@ -53,7 +53,7 @@
     <version.commons.lang3>3.19.0</version.commons.lang3>
     <version.commons.collections4>4.4</version.commons.collections4>
     <version.jetbrains>24.0.1</version.jetbrains>
-    <version.embedded.mongo>4.18.1</version.embedded.mongo>
+    <version.embedded.mongo>4.33.0</version.embedded.mongo>
     <version.log4j>2.23.0</version.log4j>
     <version.slf4j>2.0.12</version.slf4j>
     <version.jena>6.0.0</version.jena>
