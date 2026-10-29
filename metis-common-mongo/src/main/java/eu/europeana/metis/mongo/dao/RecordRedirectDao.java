@@ -30,22 +30,23 @@ public class RecordRedirectDao {
 
   /**
    * Constructor to initialize the mongo mappings/collections and the {@link Datastore} connection.
-   * This constructor is meant to be used when the database is already available.
+   * Ensures mapped indexes exist before returning. Use the three-argument constructor with
+   * {@code createIndexes = false} to skip index creation.
    *
    * @param mongoClient the mongo client connection
    * @param databaseName the database name of the record redirect database
    */
   public RecordRedirectDao(MongoClient mongoClient, String databaseName) {
-    this(mongoClient, databaseName, false);
+    this(mongoClient, databaseName, true);
   }
 
   /**
    * Constructor to initialize the mongo mappings/collections and the {@link Datastore} connection.
-   * This constructor is meant to be used mostly for when the creation of the database is required.
+   * When enabled, index creation is synchronous: this constructor waits for it to complete.
    *
    * @param mongoClient the mongo client connection
    * @param databaseName the database name of the record redirect database
-   * @param createIndexes flag that initiates the database/indices
+   * @param createIndexes whether to ensure mapped indexes exist
    */
   public RecordRedirectDao(MongoClient mongoClient, String databaseName, boolean createIndexes) {
     datastore = createDatastore(mongoClient, databaseName);
